@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRM Order Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="sandbox-banner" role="status">
+    TRAINING SANDBOX &mdash; Practice environment only. Nothing here reaches the live CRM.
+    <button class="link-btn" id="resetBtn" type="button">Reset sandbox data</button>
+  </div>
+
+  <!-- Login -->
+  <section id="loginView" class="login-wrap" hidden>
+    <form id="loginForm" class="login-card" autocomplete="off">
+      <div class="logo-mark" aria-hidden="true">CRM</div>
+      <h1>Order Training Simulator</h1>
+      <p class="muted">Sign in with any name. No real credentials are used or stored.</p>
+      <label>Trainee name<input id="loginName" required placeholder="e.g. Jane Doe"></label>
+      <label>Username<input id="loginUser" value="trainee@sandbox.example" readonly></label>
+      <button class="btn brand full" type="submit">Log In to Sandbox</button>
+    </form>
+  </section>
+
+  <!-- App shell -->
+  <div id="appView" hidden>
+    <header class="global-header">
+      <div class="app-launcher" aria-hidden="true">&#9638;</div>
+      <span class="app-name">Sales</span>
+      <nav class="tabs" id="tabs">
+        <a href="#/home" data-tab="home">Home</a>
+        <a href="#/accounts" data-tab="accounts">Accounts</a>
+        <a href="#/products" data-tab="products">Products</a>
+        <a href="#/orders" data-tab="orders">Orders</a>
+        <a href="#/guide" data-tab="guide">Training Guide</a>
+      </nav>
+      <div class="user-menu">
+        <span id="userName"></span>
+        <button class="link-btn light" id="logoutBtn" type="button">Log out</button>
+      </div>
+    </header>
+    <main id="main" tabindex="-1"></main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" aria-live="polite"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
