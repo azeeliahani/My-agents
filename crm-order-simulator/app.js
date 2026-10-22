@@ -125,7 +125,7 @@
     $('#appView').hidden = false;
     $('#userName').textContent = state.user;
 
-    const parts = (location.hash.replace(/^#\/?/, '') || 'home').split('/');
+    const parts = (currentPath || 'home').split('/');
     const [page, id] = parts;
     $$('#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === page));
     const main = $('#main');
@@ -140,7 +140,14 @@
     else renderHome(main);
     window.scrollTo(0, 0);
   }
-  window.addEventListener('hashchange', route);
+  // In-page navigation: links use href="#/page/id" but are handled here so
+  // routing doesn't depend on the URL hash (hosted viewers may not expose it).
+  let currentPath = 'home';
+  function go(path) { currentPath = path.replace(/^#\/?/, ''); route(); }
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#/"]');
+    if (a) { e.preventDefault(); go(a.getAttribute('href')); }
+  });
 
   // ---------- Login ----------
 
@@ -157,11 +164,10 @@
     state.user = name;
     save();
     mark('login');
-    location.hash = '#/home';
-    route();
+    go('home');
   });
 
-  $('#logoutBtn').addEventListener('click', () => { state.user = null; save(); location.hash = ''; route(); });
+  $('#logoutBtn').addEventListener('click', () => { state.user = null; save(); go('home'); });
 
   $('#resetBtn').addEventListener('click', () => {
     confirmDialog('Reset Sandbox', 'This deletes all practice orders and training progress in this browser. Continue?', 'Reset', () => {
@@ -171,8 +177,7 @@
       if (user) state.progress.login = true;
       save();
       toast('Sandbox data has been reset.');
-      location.hash = '#/home';
-      route();
+      go('home');
     });
   });
 
@@ -447,7 +452,7 @@
     mark('createOrder');
     closeModal();
     toast(`Order "${o.number}" was created.`);
-    location.hash = '#/orders/' + o.id;
+    go('orders/' + o.id);
   }
 
   // ---------- Order detail ----------
@@ -527,7 +532,7 @@
     const on = (sel, fn) => { const el = $(sel, main); if (el) el.addEventListener('click', fn); };
     on('#btnEdit', () => newOrderModal(null, o));
     on('#btnDelete', () => confirmDialog('Delete Order', `Are you sure you want to delete order ${esc(o.number)}?`, 'Delete', () => {
-      state.orders = state.orders.filter(x => x !== o); save(); toast(`Order "${o.number}" was deleted.`); location.hash = '#/orders';
+      state.orders = state.orders.filter(x => x !== o); save(); toast(`Order "${o.number}" was deleted.`); go('orders');
     }));
     on('#btnAddProducts', () => addProductsModal(o));
     on('#btnSubmit', () => submitOrder(o));
@@ -710,7 +715,7 @@
     mark('activated');
     save();
     toast(`Order "${o.number}" is now Activated.`);
-    if (location.hash === '#/orders/' + o.id) route();
+    if (currentPath === 'orders/' + o.id) route();
   }
 
   function rejectModal(o) {
