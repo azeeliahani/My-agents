@@ -29,3 +29,19 @@ decided the moment you click.
 
 Excel parsing uses [SheetJS](https://sheetjs.com/) loaded from cdnjs, so an
 internet connection is needed for Excel upload/export. Pasting names works offline.
+
+## Offline version (no internet, nothing uploaded)
+
+`lucky-draw-offline.html` is a single self-contained file for use inside a
+company network. Download it to your laptop and double-click to open it in any
+modern browser (Chrome, Edge, Firefox, Safari).
+
+- The Excel reader is embedded in the file, so it works with no internet connection.
+- Uploaded spreadsheets are read by the browser on your own computer. Nothing is
+  sent to any server or cloud service.
+- The page sets a strict Content-Security-Policy (`default-src 'none'`), so the
+  browser blocks any network request it could attempt.
+- Export to Excel and the template download save straight to your Downloads folder.
+
+The file includes [SheetJS](https://sheetjs.com/) Community Edition 0.18.5
+(Apache-2.0).
