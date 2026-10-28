@@ -40,6 +40,13 @@ every slot is filled. Group names match regardless of capitals or extra spaces.
 
 In both modes a winner is removed from the pool, so nobody wins twice.
 
+The rule is not shown to the audience: the draw screen, the winners list and the
+pool list never show anyone's group. The rule's progress (for example
+"ECSO 1 of 2, non-ECSO 0 of 1") appears only in the Draw rule settings. Click
+*Audience view* before presenting to hide all settings, and *Show settings* to
+bring them back. Copy and Export to Excel still include each winner's group for
+your records.
+
 ## Fairness
 
 Winners are chosen with the browser's cryptographic random generator

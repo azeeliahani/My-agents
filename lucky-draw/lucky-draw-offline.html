@@ -197,13 +197,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .segmented label:has(input:focus-visible) { outline: 3px solid var(--gold); outline-offset: 1px; }
   .quota-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .quota-row input { width: 5.5em; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
-  .slots { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .slot { font-family: var(--font-mono); font-size: .8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
-  .slot.full { border-color: var(--gold); color: var(--ink); background: color-mix(in srgb, var(--gold) 16%, transparent); }
-  .reel-group { margin-top: -8px; min-height: 1.5em; font-family: var(--font-mono); font-size: .9rem; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
-  .winners .who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
-  .tag { font-family: var(--font-mono); font-size: .7rem; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
-  .tag.in { border-color: var(--red); color: var(--red); }
+  .progress { margin: 0; font-family: var(--font-mono); font-size: .8rem; font-variant-numeric: tabular-nums; }
+  /* Audience view: settings stay off screen while presenting. */
+  body.audience .side { display: none; }
+  body.audience .layout { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
+  @media (max-width: 1000px) { body.audience .layout { grid-template-columns: minmax(0, 1fr); } }
 </style>
 </head>
 <body>
@@ -212,6 +210,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   <header class="top">
     <h1>Lucky Draw</h1>
     <div class="top-actions">
+      <button class="btn quiet" id="audienceBtn" type="button" aria-pressed="false">Audience view</button>
       <button class="btn quiet" id="fullscreenBtn" type="button">Fullscreen</button>
       <button class="btn quiet warn" id="resetBtn" type="button">Start over</button>
     </div>
@@ -278,7 +277,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
             <label class="field" for="quotaOut">Winners from non-<span class="gname">ECSO</span></label>
             <input type="number" id="quotaOut" min="0" max="999" value="1">
           </div>
-          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled.</p>
+          <p class="progress" id="ruleProgress"></p>
+          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled. Groups are never shown on the draw screen; use Audience view to hide these settings while presenting.</p>
         </div>
         <p class="muted small" id="unlimitedHelp" hidden>Each round picks one name at random from everyone left. Keep drawing as long as you like.</p>
         <p id="ruleWarn" class="status err" hidden></p>
@@ -290,13 +290,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         <span><b id="poolCount">0</b>in the pool</span>
         <span><b id="winnerCount">0</b>winners</span>
       </div>
-      <div class="slots" id="slots" hidden>
-        <span class="slot" id="slotIn"></span>
-        <span class="slot" id="slotOut"></span>
-      </div>
       <div class="round" id="roundLabel">Round 1</div>
       <div class="reel" id="reel" aria-live="polite">Ready</div>
-      <div class="reel-group" id="reelGroup"></div>
       <button class="btn primary big" id="drawBtn" type="button" disabled>Draw winner</button>
       <p class="hint muted">or press Space</p>
       <button class="link-btn" id="undoBtn" type="button" hidden>Undo last draw</button>
@@ -400,7 +395,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function groupLabel() { return state.rule.group || "group"; }
 
   function winnersIn() { return state.winners.filter(inGroup).length; }
-  function quotaTotal() { return state.rule.quotaIn + state.rule.quotaOut; }
 
   // Names that can win this round.
   function eligible() {
@@ -562,11 +556,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   }
 
   // ---------- Drawing ----------
-  function setReel(text, group) {
+  function setReel(text) {
     var reel = $("reel");
     reel.textContent = text;
     reel.classList.remove("winner", "spinning");
-    $("reelGroup").textContent = group || "";
   }
 
   function draw() {
@@ -582,7 +575,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     var reel = $("reel");
     reel.classList.remove("winner");
     reel.classList.add("spinning");
-    $("reelGroup").textContent = "";
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     var delay = reduce ? 400 : 40;
@@ -598,7 +590,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       save();
       reel.classList.remove("spinning");
       reel.textContent = winner.name;
-      $("reelGroup").textContent = winner.group;
       void reel.offsetWidth;
       reel.classList.add("winner");
       if (!reduce) confetti();
@@ -683,7 +674,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function render() {
     var choices = eligible();
     var quota = quotaActive();
-    var total = quotaTotal();
     var wonIn = winnersIn(), wonOut = state.winners.length - wonIn;
     var canDraw = choices.length > 0;
 
@@ -696,22 +686,17 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     $("exportBtn").disabled = !state.winners.length;
     $("sampleNote").hidden = !state.sample;
 
-    $("slots").hidden = !quota;
-    if (quota) {
-      $("slotIn").textContent = groupLabel() + " " + wonIn + " of " + state.rule.quotaIn;
-      $("slotOut").textContent = "Non-" + groupLabel() + " " + wonOut + " of " + state.rule.quotaOut;
-      $("slotIn").classList.toggle("full", wonIn >= state.rule.quotaIn);
-      $("slotOut").classList.toggle("full", wonOut >= state.rule.quotaOut);
-    }
-
     var label;
     if (!state.participants.length) label = "Add names to begin";
-    else if (canDraw) label = "Round " + pad(state.winners.length + 1) + (quota ? " of " + pad(total) : "");
-    else if (quota && wonIn >= state.rule.quotaIn && wonOut >= state.rule.quotaOut) label = "All " + total + " winners drawn";
-    else if (quota) label = "No eligible names left";
+    else if (canDraw) label = "Round " + pad(state.winners.length + 1);
+    else if (quota) label = "All winners drawn";
     else label = "Every name has been drawn";
     $("roundLabel").textContent = label;
     if (!state.participants.length && !drawing) setReel("Add names to begin");
+
+    $("ruleProgress").textContent = quota
+      ? "Drawn so far: " + groupLabel() + " " + wonIn + " of " + state.rule.quotaIn + ", non-" + groupLabel() + " " + wonOut + " of " + state.rule.quotaOut
+      : "";
 
     // Warn when a group can't fill its slots.
     var warn = "";
@@ -732,18 +717,10 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     state.winners.slice().reverse().forEach(function (w) {
       var li = document.createElement("li");
       var no = document.createElement("span"); no.className = "no"; no.textContent = "No. " + pad(w.round);
-      var who = document.createElement("span"); who.className = "who";
       var name = document.createElement("span"); name.className = "name"; name.textContent = w.name;
-      who.appendChild(name);
-      if (w.group) {
-        var tag = document.createElement("span");
-        tag.className = "tag" + (inGroup(w) ? " in" : "");
-        tag.textContent = w.group;
-        who.appendChild(tag);
-      }
       var time = document.createElement("span"); time.className = "time";
       time.textContent = new Date(w.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      li.append(no, who, time);
+      li.append(no, name, time);
       list.appendChild(li);
     });
     $("noWinners").hidden = state.winners.length > 0;
@@ -752,7 +729,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     pool.innerHTML = "";
     state.pool.slice(0, 500).forEach(function (p) {
       var li = document.createElement("li");
-      li.textContent = p.name + (p.group ? " (" + p.group + ")" : "");
+      li.textContent = p.name;
       pool.appendChild(li);
     });
     if (state.pool.length > 500) {
@@ -844,6 +821,13 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       renderAll();
     });
   });
+  function setAudience(on) {
+    document.body.classList.toggle("audience", on);
+    $("audienceBtn").setAttribute("aria-pressed", String(on));
+    $("audienceBtn").textContent = on ? "Show settings" : "Audience view";
+    closeConfirm(false);
+  }
+  $("audienceBtn").addEventListener("click", function () { setAudience(!document.body.classList.contains("audience")); });
   $("fullscreenBtn").addEventListener("click", function () {
     try {
       if (document.fullscreenElement) document.exitFullscreen();
@@ -859,7 +843,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   if (load()) {
     var last = state.winners[state.winners.length - 1];
-    if (last) setReel(last.name, last.group);
+    if (last) setReel(last.name);
     if (!state.sample) setStatus("Picked up where you left off: " + state.participants.length + " participants.", "ok");
     renderAll();
   } else {
