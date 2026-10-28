@@ -1,0 +1,817 @@
+<title>Lucky Draw</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Figtree:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* Layout: a prize-stage board — reel and draw button centre stage, entry desk left, ticket stubs of winners right. */
+  :root {
+    --bg: #fbf6ef;
+    --panel: #ffffff;
+    --ink: #2a1712;
+    --muted: #7a6159;
+    --line: #ecdcd0;
+    --red: #b3261e;
+    --red-ink: #ffffff;
+    --gold: #c8901a;
+    --stage: #5c0f0b;
+    --stage-ink: #ffd36b;
+    --ok: #1e7a3c;
+    --font-display: "Anton", Impact, "Arial Narrow", sans-serif;
+    --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #170c0a; --panel: #22130f; --ink: #f6e9e1; --muted: #b39a90; --line: #3a221c;
+      --red: #e0453b; --gold: #e3ad3c; --stage: #3d0805; --stage-ink: #ffd36b; --ok: #5cc47f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #170c0a; --panel: #22130f; --ink: #f6e9e1; --muted: #b39a90; --line: #3a221c;
+    --red: #e0453b; --gold: #e3ad3c; --stage: #3d0805; --stage-ink: #ffd36b; --ok: #5cc47f;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 20px 32px;
+  }
+  .wrap { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .top h1 {
+    margin: 0; font-family: var(--font-display); font-weight: 400;
+    font-size: 2rem; letter-spacing: .02em; text-transform: uppercase; color: var(--red);
+  }
+  .top-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .stage { order: -1; }
+  }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  h2 { margin: 0; font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+  .btn {
+    font: inherit; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 8px 14px; border-radius: 6px;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--gold); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.quiet { background: transparent; }
+  .btn.warn { color: var(--red); }
+  .btn.primary { background: var(--red); border-color: var(--red); color: var(--red-ink); }
+  .btn:focus-visible, .link-btn:focus-visible, .drop:focus-within, select:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 3px solid var(--gold); outline-offset: 2px;
+  }
+  .link-btn { font: inherit; background: none; border: 0; padding: 0; color: var(--red); text-decoration: underline; cursor: pointer; }
+  .muted { color: var(--muted); }
+  .small { font-size: .85rem; margin: 0; }
+
+  .drop {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
+    border: 2px dashed var(--line); border-radius: 8px; padding: 24px 12px; cursor: pointer;
+  }
+  .drop:hover, .drop.over { border-color: var(--gold); }
+  .drop strong { font-size: 1rem; }
+  .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; font-weight: 600; }
+  label.check { display: flex; gap: 8px; align-items: center; font-size: .9rem; }
+  select, textarea {
+    width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 8px;
+  }
+  details > summary { cursor: pointer; font-weight: 600; }
+  details[open] > summary { margin-bottom: 8px; }
+  details .btn { margin-top: 8px; }
+  .status { min-height: 1.4em; font-size: .9rem; margin: 0; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--red); }
+
+  .sample-note {
+    margin: 0; font-size: .85rem; padding: 8px 10px; border-radius: 6px;
+    background: color-mix(in srgb, var(--gold) 14%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+  }
+
+  /* Stage */
+  .stage { align-items: center; text-align: center; gap: 18px; padding: 24px; }
+  .counts { display: flex; gap: 28px; color: var(--muted); font-size: .9rem; }
+  .counts b { display: block; color: var(--ink); font-family: var(--font-display); font-weight: 400; font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .round { font-family: var(--font-mono); font-size: .85rem; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+  .reel {
+    position: relative; width: 100%; min-height: 190px;
+    display: flex; align-items: center; justify-content: center; padding: 24px 28px;
+    background: var(--stage); color: var(--stage-ink); border-radius: 10px;
+    font-family: var(--font-display); font-weight: 400; text-transform: uppercase; letter-spacing: .02em;
+    font-size: clamp(1.8rem, 6vw, 3.6rem); line-height: 1.1; overflow-wrap: anywhere;
+    box-shadow: inset 0 0 0 6px var(--stage), inset 0 0 0 8px var(--gold);
+  }
+  /* bulb border, like a prize-show marquee */
+  .reel::before {
+    content: ""; position: absolute; inset: 3px; border-radius: 9px; pointer-events: none;
+    background: radial-gradient(circle, var(--stage-ink) 0 2px, transparent 2.5px) 0 0 / 18px 18px;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; padding: 4px; opacity: .55;
+  }
+  .reel.spinning { opacity: .85; }
+  .reel.winner { animation: pop .6s ease-out; }
+  @keyframes pop { 0% { transform: scale(.88); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
+  .btn.big { font-size: 1.15rem; padding: 14px 40px; border-radius: 999px; letter-spacing: .02em; }
+  .hint { margin: -8px 0 0; font-size: .8rem; }
+
+  /* Winners as ticket stubs */
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .winners { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow: auto; }
+  .winners li {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    padding: 10px 12px; border: 1px solid var(--line); border-left: 0; border-radius: 0 6px 6px 0;
+    background: linear-gradient(90deg, var(--red) 0 6px, transparent 6px);
+    padding-left: 18px;
+  }
+  .winners .no { font-family: var(--font-mono); font-size: .8rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .winners .name { font-weight: 700; overflow-wrap: anywhere; }
+  .winners .time { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); }
+  .pool { max-height: 30vh; overflow: auto; padding-left: 20px; margin: 0; font-size: .9rem; }
+
+  /* In-page confirm */
+  .confirm {
+    display: flex; flex-direction: column; gap: 10px; padding: 14px;
+    border: 1px solid var(--red); border-radius: 8px; background: color-mix(in srgb, var(--red) 8%, var(--panel));
+  }
+  .confirm p { margin: 0; font-weight: 600; }
+  .confirm div { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .copy-fallback { width: 100%; font-family: var(--font-mono); font-size: .8rem; }
+  #confetti { position: fixed; inset: 0; pointer-events: none; width: 100%; height: 100%; z-index: 20; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reel.winner { animation: none; }
+  }
+  .side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .fields { display: flex; flex-direction: column; gap: 10px; }
+  .segmented { display: flex; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; }
+  .segmented label { flex: 1; text-align: center; padding: 7px 8px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .9rem; }
+  .segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .segmented label:has(input:checked) { background: var(--red); color: var(--red-ink); }
+  .segmented label:has(input:focus-visible) { outline: 3px solid var(--gold); outline-offset: 1px; }
+  .quota-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .quota-row input { width: 5.5em; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+  .slots { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .slot { font-family: var(--font-mono); font-size: .8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .slot.full { border-color: var(--gold); color: var(--ink); background: color-mix(in srgb, var(--gold) 16%, transparent); }
+  .reel-group { margin-top: -8px; min-height: 1.5em; font-family: var(--font-mono); font-size: .9rem; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+  .winners .who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+  .tag { font-family: var(--font-mono); font-size: .7rem; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.in { border-color: var(--red); color: var(--red); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Lucky Draw</h1>
+    <div class="top-actions">
+      <button class="btn quiet" id="fullscreenBtn" type="button">Fullscreen</button>
+      <button class="btn quiet warn" id="resetBtn" type="button">Start over</button>
+    </div>
+  </header>
+
+  <div id="confirmBox" class="confirm" hidden role="alertdialog" aria-labelledby="confirmText">
+    <p id="confirmText"></p>
+    <div>
+      <button class="btn primary" id="confirmYes" type="button">Yes, continue</button>
+      <button class="btn" id="confirmNo" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <main class="layout">
+    <div class="side">
+      <section class="panel">
+        <h2>Participants</h2>
+        <label class="drop" id="dropZone">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.ods">
+          <strong>Upload Excel file</strong>
+          <span class="muted small">.xlsx, .xls or .csv. Click or drag &amp; drop.</span>
+        </label>
+        <p class="muted small">Names are read from the first sheet: one person per row, with a column for their group (for example "Department") if you want to use the group rule.</p>
+
+        <div id="columnPicker" class="fields" hidden>
+          <label class="field">Name column
+            <select id="columnSelect"></select>
+          </label>
+          <label class="field">Group column
+            <select id="groupColSelect"></select>
+          </label>
+          <label class="check"><input type="checkbox" id="headerCheck" checked> First row is a header</label>
+        </div>
+
+        <details>
+          <summary>Or paste names</summary>
+          <p class="muted small">One person per line. To include the group, copy two columns from Excel, or type "Name, Group".</p>
+          <textarea id="pasteInput" rows="6" placeholder="Aisha Rahman, ECSO&#10;Ben Lee, Finance"></textarea>
+          <button class="btn" id="pasteBtn" type="button">Use pasted names</button>
+        </details>
+
+        <label class="check"><input type="checkbox" id="dedupeCheck" checked> Remove duplicate names</label>
+        <p id="sampleNote" class="sample-note" hidden>Showing sample names so you can try a draw. Upload your list to replace them.</p>
+        <p id="loadStatus" class="status" role="status"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Draw rule</h2>
+        <div class="segmented" role="radiogroup" aria-label="Draw rule">
+          <label><input type="radio" name="mode" id="modeQuota" value="quota" checked> By group</label>
+          <label><input type="radio" name="mode" id="modeUnlimited" value="unlimited"> No limit</label>
+        </div>
+        <div id="quotaFields" class="fields">
+          <label class="field">Group
+            <select id="groupValueSelect"></select>
+          </label>
+          <div class="quota-row">
+            <label class="field" for="quotaIn">Winners from <span class="gname">ECSO</span></label>
+            <input type="number" id="quotaIn" min="0" max="999" value="2">
+          </div>
+          <div class="quota-row">
+            <label class="field" for="quotaOut">Winners from non-<span class="gname">ECSO</span></label>
+            <input type="number" id="quotaOut" min="0" max="999" value="1">
+          </div>
+          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled.</p>
+        </div>
+        <p class="muted small" id="unlimitedHelp" hidden>Each round picks one name at random from everyone left. Keep drawing as long as you like.</p>
+        <p id="ruleWarn" class="status err" hidden></p>
+      </section>
+    </div>
+
+    <section class="panel stage">
+      <div class="counts">
+        <span><b id="poolCount">0</b>in the pool</span>
+        <span><b id="winnerCount">0</b>winners</span>
+      </div>
+      <div class="slots" id="slots" hidden>
+        <span class="slot" id="slotIn"></span>
+        <span class="slot" id="slotOut"></span>
+      </div>
+      <div class="round" id="roundLabel">Round 1</div>
+      <div class="reel" id="reel" aria-live="polite">Ready</div>
+      <div class="reel-group" id="reelGroup"></div>
+      <button class="btn primary big" id="drawBtn" type="button" disabled>Draw winner</button>
+      <p class="hint muted">or press Space</p>
+      <button class="link-btn" id="undoBtn" type="button" hidden>Undo last draw</button>
+    </section>
+
+    <section class="panel">
+      <div class="row">
+        <h2>Winners</h2>
+        <button class="btn" id="copyBtn" type="button" disabled>Copy winners</button>
+      </div>
+      <p id="copyStatus" class="status" role="status" hidden></p>
+      <textarea id="copyFallback" class="copy-fallback" rows="5" readonly hidden></textarea>
+      <ol id="winnerList" class="winners"></ol>
+      <p id="noWinners" class="muted small">No winners yet. Each draw adds one here.</p>
+      <details>
+        <summary>Still in the pool (<span id="poolCount2">0</span>)</summary>
+        <ul id="poolList" class="pool"></ul>
+      </details>
+    </section>
+  </main>
+</div>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "luckyDraw.v2";
+  var SAMPLE_ROWS = [["Name", "Department"],
+    ["Aisha Rahman", "ECSO"], ["Ben Lee", "Finance"], ["Chandra Kumar", "ECSO"], ["Daniel Wong", "HR"],
+    ["Elena Petrova", "ECSO"], ["Farid Hassan", "IT"], ["Grace Lim", "ECSO"], ["Hiro Tanaka", "Finance"],
+    ["Isabel Cruz", "ECSO"], ["Jamal Osei", "Operations"], ["Kavya Nair", "ECSO"], ["Liam O'Brien", "HR"]];
+  var GROUP_HEADER = /dept|department|group|division|unit|team|section|category|bu\b/i;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function freshState() {
+    return {
+      participants: [], pool: [], winners: [], sample: false,
+      rows: null, nameCol: 0, groupCol: -1, header: true,
+      rule: { mode: "quota", group: "ECSO", quotaIn: 2, quotaOut: 1 }
+    };
+  }
+  // participants/pool: [{ name, group }]; winners: [{ name, group, round, time }]
+  var state = freshState();
+  var drawing = false;
+
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+  }
+  function load() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (saved && Array.isArray(saved.pool) && Array.isArray(saved.winners) && (saved.pool.length || saved.winners.length)) {
+        state = Object.assign(freshState(), saved);
+        state.rule = Object.assign(freshState().rule, saved.rule);
+        return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+
+  // Unbiased integer in [0, max) using the browser's cryptographic RNG.
+  function randomIndex(max) {
+    if (!window.crypto || !crypto.getRandomValues) return Math.floor(Math.random() * max);
+    var limit = Math.floor(0x100000000 / max) * max;
+    var buf = new Uint32Array(1);
+    do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+    return buf[0] % max;
+  }
+
+  // In-page confirmation (browser dialogs are unavailable here).
+  var pendingYes = null;
+  function askConfirm(message, onYes, onNo) {
+    $("confirmText").textContent = message;
+    pendingYes = { yes: onYes, no: onNo };
+    $("confirmBox").hidden = false;
+    $("confirmYes").focus();
+  }
+  function closeConfirm(answer) {
+    var p = pendingYes;
+    $("confirmBox").hidden = true;
+    pendingYes = null;
+    if (p && answer && p.yes) p.yes();
+    if (p && !answer && p.no) p.no();
+  }
+  $("confirmYes").addEventListener("click", function () { closeConfirm(true); });
+  $("confirmNo").addEventListener("click", function () { closeConfirm(false); });
+
+  function setStatus(msg, kind) {
+    var el = $("loadStatus");
+    el.textContent = msg;
+    el.className = "status" + (kind ? " " + kind : "");
+  }
+
+  // ---------- Groups and the draw rule ----------
+  function norm(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
+  function hasGroups() { return state.groupCol >= 0; }
+  function quotaActive() { return state.rule.mode === "quota" && hasGroups(); }
+  function inGroup(p) { return norm(p.group) === norm(state.rule.group); }
+  function groupLabel() { return state.rule.group || "group"; }
+
+  function winnersIn() { return state.winners.filter(inGroup).length; }
+  function quotaTotal() { return state.rule.quotaIn + state.rule.quotaOut; }
+
+  // Names that can win this round.
+  function eligible() {
+    if (!quotaActive()) return state.pool;
+    var wonIn = winnersIn(), wonOut = state.winners.length - wonIn;
+    return state.pool.filter(function (p) {
+      return inGroup(p) ? wonIn < state.rule.quotaIn : wonOut < state.rule.quotaOut;
+    });
+  }
+
+  function groupValues() {
+    var seen = {}, out = [];
+    state.participants.forEach(function (p) {
+      var g = String(p.group || "").trim();
+      if (g && !seen[norm(g)]) { seen[norm(g)] = true; out.push(g); }
+    });
+    return out.sort(function (a, b) { return a.localeCompare(b); });
+  }
+
+  // ---------- Loading names ----------
+  function buildParticipants() {
+    var rows = state.header ? state.rows.slice(1) : state.rows;
+    var seen = {}, dedupe = $("dedupeCheck").checked, out = [];
+    rows.forEach(function (r) {
+      var name = String(r[state.nameCol] == null ? "" : r[state.nameCol]).trim();
+      if (!name) return;
+      if (dedupe) { if (seen[norm(name)]) return; seen[norm(name)] = true; }
+      out.push({ name: name, group: state.groupCol >= 0 ? String(r[state.groupCol] == null ? "" : r[state.groupCol]).trim() : "" });
+    });
+    return out;
+  }
+
+  function guessColumns(rows) {
+    var header = rows[0] || [];
+    var width = rows.reduce(function (w, r) { return Math.max(w, r.length); }, 0);
+    var nameCol = -1, groupCol = -1, groupByValue = -1;
+    for (var i = 0; i < width; i++) {
+      var label = String(header[i] || "").trim();
+      if (nameCol < 0 && /name/i.test(label)) nameCol = i;
+      if (groupCol < 0 && GROUP_HEADER.test(label)) groupCol = i;
+      if (groupByValue < 0 && rows.some(function (r) { return norm(r[i]) === norm(state.rule.group || "ECSO"); })) groupByValue = i;
+    }
+    var looksLikeHeader = /name|participant|staff|employee|member|dept|department|group/i.test(header.join(" "));
+    if (groupByValue >= 0 && groupByValue !== nameCol) groupCol = groupByValue;
+    if (nameCol < 0) nameCol = groupCol === 0 && width > 1 ? 1 : 0;
+    if (groupCol === nameCol) groupCol = -1;
+    return { width: width, nameCol: nameCol, groupCol: groupCol, header: looksLikeHeader };
+  }
+
+  function fillColumnSelects() {
+    var rows = state.rows || [];
+    var header = rows[0] || [];
+    var width = rows.reduce(function (w, r) { return Math.max(w, r.length); }, 0);
+    var nameSel = $("columnSelect"), groupSel = $("groupColSelect");
+    nameSel.innerHTML = ""; groupSel.innerHTML = "";
+    var none = document.createElement("option");
+    none.value = -1; none.textContent = "None";
+    groupSel.appendChild(none);
+    for (var i = 0; i < width; i++) {
+      var label = state.header ? String(header[i] || "").trim() : "";
+      var text = "Column " + colLetter(i) + (label ? " (" + label + ")" : "");
+      [nameSel, groupSel].forEach(function (sel) {
+        var opt = document.createElement("option");
+        opt.value = i; opt.textContent = text; sel.appendChild(opt);
+      });
+    }
+    nameSel.value = state.nameCol;
+    groupSel.value = state.groupCol;
+    $("headerCheck").checked = state.header;
+    $("columnPicker").hidden = !rows.length;
+  }
+
+  function colLetter(i) {
+    var s = "";
+    for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s;
+    return s;
+  }
+
+  function pickDefaultGroupValue() {
+    var values = groupValues();
+    var match = values.filter(function (v) { return norm(v) === norm(state.rule.group); })[0];
+    if (match) state.rule.group = match;
+    else if (values.length) state.rule.group = values[0];
+  }
+
+  // Replace the participant list, asking first if a draw is under way.
+  function commitRows(rows, source, opts) {
+    opts = opts || {};
+    var apply = function () {
+      var prevRule = state.rule;
+      state = Object.assign(freshState(), { rows: rows, sample: !!opts.sample, rule: prevRule });
+      var g = guessColumns(rows);
+      state.nameCol = g.nameCol; state.groupCol = g.groupCol; state.header = g.header;
+      state.participants = buildParticipants();
+      if (!state.participants.length) {
+        setStatus("No names found in " + source + ". Check that the names are in the first sheet.", "err");
+        state.participants = []; save(); renderAll(); return;
+      }
+      state.pool = state.participants.slice();
+      pickDefaultGroupValue();
+      save();
+      if (!opts.sample) {
+        var groups = hasGroups() ? " Groups read from column " + colLetter(state.groupCol) + "." : " No group column found.";
+        setStatus("Loaded " + state.participants.length + " names from " + source + "." + groups, "ok");
+      }
+      setReel("Ready");
+      $("undoBtn").hidden = true;
+      renderAll();
+    };
+    if (state.winners.length && !state.sample) {
+      askConfirm("Loading a new list clears the " + state.winners.length + " winners drawn so far. Continue?", apply);
+    } else apply();
+  }
+
+  // Re-read the current rows after a column or header change.
+  function rebuildFromRows() {
+    var apply = function () {
+      state.participants = buildParticipants();
+      state.pool = state.participants.slice();
+      state.winners = [];
+      pickDefaultGroupValue();
+      save();
+      setReel("Ready");
+      $("undoBtn").hidden = true;
+      setStatus(state.participants.length + " names ready.", "ok");
+      renderAll();
+    };
+    if (state.winners.length && !state.sample) {
+      askConfirm("Changing columns clears the " + state.winners.length + " winners drawn so far. Continue?", apply, function () {
+        fillColumnSelects();
+      });
+    } else apply();
+  }
+
+  function readFile(file) {
+    if (!file) return;
+    if (typeof XLSX === "undefined") {
+      setStatus("The Excel reader didn't load. Check your connection and reload, or paste the names instead.", "err");
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        commitRows(XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false }), file.name);
+      } catch (err) {
+        setStatus("Couldn't read that file. Save it as .xlsx or .csv and try again.", "err");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function parsePasted(text) {
+    return text.split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (line) {
+      var parts = line.indexOf("\t") >= 0 ? line.split("\t") : line.split(",");
+      return parts.map(function (s) { return s.trim(); });
+    });
+  }
+
+  // ---------- Drawing ----------
+  function setReel(text, group) {
+    var reel = $("reel");
+    reel.textContent = text;
+    reel.classList.remove("winner", "spinning");
+    $("reelGroup").textContent = group || "";
+  }
+
+  function draw() {
+    if (drawing) return;
+    var choices = eligible();
+    if (!choices.length) return;
+    drawing = true;
+    closeConfirm(false);
+    $("drawBtn").disabled = true;
+    $("undoBtn").hidden = true;
+
+    var winner = choices[randomIndex(choices.length)];
+    var reel = $("reel");
+    reel.classList.remove("winner");
+    reel.classList.add("spinning");
+    $("reelGroup").textContent = "";
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    var delay = reduce ? 400 : 40;
+    (function tick() {
+      if (delay < 380) {
+        reel.textContent = choices[randomIndex(choices.length)].name;
+        delay *= 1.12;
+        setTimeout(tick, delay);
+        return;
+      }
+      state.pool.splice(state.pool.indexOf(winner), 1);
+      state.winners.push({ name: winner.name, group: winner.group, round: state.winners.length + 1, time: new Date().toISOString() });
+      save();
+      reel.classList.remove("spinning");
+      reel.textContent = winner.name;
+      $("reelGroup").textContent = winner.group;
+      void reel.offsetWidth;
+      reel.classList.add("winner");
+      if (!reduce) confetti();
+      drawing = false;
+      render();
+      $("undoBtn").hidden = false;
+    })();
+  }
+
+  function undo() {
+    var last = state.winners.pop();
+    if (!last) return;
+    state.pool.push({ name: last.name, group: last.group });
+    save();
+    setReel(last.name + " is back in the pool");
+    $("undoBtn").hidden = true;
+    render();
+  }
+
+  function pad(n) { return String(n).padStart(3, "0"); }
+
+  function copyWinners() {
+    var lines = ["Round\tWinner\tGroup\tDrawn at"].concat(state.winners.map(function (w) {
+      return w.round + "\t" + w.name + "\t" + (w.group || "") + "\t" + new Date(w.time).toLocaleString();
+    }));
+    var text = lines.join("\n");
+    var status = $("copyStatus");
+    var fallback = $("copyFallback");
+    function showFallback() {
+      fallback.value = text;
+      fallback.hidden = false;
+      fallback.focus();
+      fallback.select();
+      status.textContent = "Select all the text below and copy it, then paste into Excel.";
+      status.className = "status";
+      status.hidden = false;
+    }
+    try {
+      navigator.clipboard.writeText(text).then(function () {
+        fallback.hidden = true;
+        status.textContent = "Copied " + state.winners.length + " winners. Paste into Excel.";
+        status.className = "status ok";
+        status.hidden = false;
+      }, showFallback);
+    } catch (e) { showFallback(); }
+  }
+
+  // ---------- Rendering ----------
+  function renderRule() {
+    var groupsOk = hasGroups();
+    $("modeQuota").checked = state.rule.mode === "quota";
+    $("modeUnlimited").checked = state.rule.mode !== "quota";
+    $("quotaFields").hidden = state.rule.mode !== "quota";
+    $("unlimitedHelp").hidden = state.rule.mode === "quota";
+    var sel = $("groupValueSelect");
+    sel.innerHTML = "";
+    groupValues().forEach(function (v) {
+      var opt = document.createElement("option"); opt.value = v; opt.textContent = v; sel.appendChild(opt);
+    });
+    sel.value = state.rule.group;
+    sel.disabled = !groupsOk;
+    $("quotaIn").value = state.rule.quotaIn;
+    $("quotaOut").value = state.rule.quotaOut;
+    Array.prototype.forEach.call(document.querySelectorAll(".gname"), function (el) { el.textContent = groupLabel(); });
+  }
+
+  function render() {
+    var choices = eligible();
+    var quota = quotaActive();
+    var total = quotaTotal();
+    var wonIn = winnersIn(), wonOut = state.winners.length - wonIn;
+    var canDraw = choices.length > 0;
+
+    $("poolCount").textContent = state.pool.length;
+    $("poolCount2").textContent = state.pool.length;
+    $("winnerCount").textContent = state.winners.length;
+    $("drawBtn").disabled = drawing || !canDraw;
+    $("drawBtn").textContent = state.winners.length ? "Draw next winner" : "Draw winner";
+    $("copyBtn").disabled = !state.winners.length;
+    $("sampleNote").hidden = !state.sample;
+
+    $("slots").hidden = !quota;
+    if (quota) {
+      $("slotIn").textContent = groupLabel() + " " + wonIn + " of " + state.rule.quotaIn;
+      $("slotOut").textContent = "Non-" + groupLabel() + " " + wonOut + " of " + state.rule.quotaOut;
+      $("slotIn").classList.toggle("full", wonIn >= state.rule.quotaIn);
+      $("slotOut").classList.toggle("full", wonOut >= state.rule.quotaOut);
+    }
+
+    var label;
+    if (!state.participants.length) label = "Add names to begin";
+    else if (canDraw) label = "Round " + pad(state.winners.length + 1) + (quota ? " of " + pad(total) : "");
+    else if (quota && wonIn >= state.rule.quotaIn && wonOut >= state.rule.quotaOut) label = "All " + total + " winners drawn";
+    else if (quota) label = "No eligible names left";
+    else label = "Every name has been drawn";
+    $("roundLabel").textContent = label;
+    if (!state.participants.length && !drawing) setReel("Add names to begin");
+
+    // Warn when a group can't fill its slots.
+    var warn = "";
+    if (state.rule.mode === "quota" && state.participants.length) {
+      if (!hasGroups()) warn = "Choose a group column under Participants to use this rule. Until then, everyone is drawn with no limit.";
+      else {
+        var leftIn = state.pool.filter(inGroup).length, leftOut = state.pool.length - leftIn;
+        var needIn = Math.max(0, state.rule.quotaIn - wonIn), needOut = Math.max(0, state.rule.quotaOut - wonOut);
+        if (leftIn < needIn) warn = "Only " + leftIn + " " + groupLabel() + " " + (leftIn === 1 ? "name is" : "names are") + " left for " + needIn + " " + groupLabel() + " slots.";
+        else if (leftOut < needOut) warn = "Only " + leftOut + " non-" + groupLabel() + " " + (leftOut === 1 ? "name is" : "names are") + " left for " + needOut + " slots.";
+      }
+    }
+    $("ruleWarn").textContent = warn;
+    $("ruleWarn").hidden = !warn;
+
+    var list = $("winnerList");
+    list.innerHTML = "";
+    state.winners.slice().reverse().forEach(function (w) {
+      var li = document.createElement("li");
+      var no = document.createElement("span"); no.className = "no"; no.textContent = "No. " + pad(w.round);
+      var who = document.createElement("span"); who.className = "who";
+      var name = document.createElement("span"); name.className = "name"; name.textContent = w.name;
+      who.appendChild(name);
+      if (w.group) {
+        var tag = document.createElement("span");
+        tag.className = "tag" + (inGroup(w) ? " in" : "");
+        tag.textContent = w.group;
+        who.appendChild(tag);
+      }
+      var time = document.createElement("span"); time.className = "time";
+      time.textContent = new Date(w.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      li.append(no, who, time);
+      list.appendChild(li);
+    });
+    $("noWinners").hidden = state.winners.length > 0;
+
+    var pool = $("poolList");
+    pool.innerHTML = "";
+    state.pool.slice(0, 500).forEach(function (p) {
+      var li = document.createElement("li");
+      li.textContent = p.name + (p.group ? " (" + p.group + ")" : "");
+      pool.appendChild(li);
+    });
+    if (state.pool.length > 500) {
+      var more = document.createElement("li");
+      more.className = "muted";
+      more.textContent = "and " + (state.pool.length - 500) + " more";
+      pool.appendChild(more);
+    }
+  }
+
+  function renderAll() { fillColumnSelects(); renderRule(); render(); }
+
+  function confetti() {
+    var canvas = $("confetti");
+    var ctx = canvas.getContext("2d");
+    canvas.width = innerWidth; canvas.height = innerHeight;
+    var colors = ["#b3261e", "#e3ad3c", "#ffd36b", "#e0453b", "#ffffff", "#c8901a"];
+    var bits = [];
+    for (var i = 0; i < 170; i++) {
+      bits.push({
+        x: canvas.width / 2, y: canvas.height / 3,
+        vx: (Math.random() - 0.5) * 16, vy: Math.random() * -14 - 4,
+        s: Math.random() * 6 + 4, r: Math.random() * 6, c: colors[i % colors.length]
+      });
+    }
+    var frames = 0;
+    (function frame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      bits.forEach(function (b) {
+        b.vy += 0.35; b.vx *= 0.99; b.x += b.vx; b.y += b.vy; b.r += 0.1;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.r);
+        ctx.fillStyle = b.c; ctx.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2);
+        ctx.restore();
+      });
+      if (++frames < 150) requestAnimationFrame(frame);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    })();
+  }
+
+  // ---------- Wiring ----------
+  $("fileInput").addEventListener("change", function (e) { readFile(e.target.files[0]); e.target.value = ""; });
+  var drop = $("dropZone");
+  ["dragenter", "dragover"].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) { readFile(e.dataTransfer.files[0]); });
+
+  $("columnSelect").addEventListener("change", function (e) { state.nameCol = Number(e.target.value); rebuildFromRows(); });
+  $("groupColSelect").addEventListener("change", function (e) { state.groupCol = Number(e.target.value); rebuildFromRows(); });
+  $("headerCheck").addEventListener("change", function (e) { state.header = e.target.checked; rebuildFromRows(); });
+  $("dedupeCheck").addEventListener("change", function () { if (state.rows) rebuildFromRows(); });
+  $("pasteBtn").addEventListener("click", function () {
+    var rows = parsePasted($("pasteInput").value);
+    if (!rows.length) { setStatus("Paste at least one name first.", "err"); return; }
+    commitRows(rows, "pasted text");
+  });
+
+  $("modeQuota").addEventListener("change", function () { state.rule.mode = "quota"; save(); renderRule(); render(); });
+  $("modeUnlimited").addEventListener("change", function () { state.rule.mode = "unlimited"; save(); renderRule(); render(); });
+  $("groupValueSelect").addEventListener("change", function (e) { state.rule.group = e.target.value; save(); renderRule(); render(); });
+  ["quotaIn", "quotaOut"].forEach(function (id) {
+    $(id).addEventListener("input", function (e) {
+      var n = Math.max(0, Math.min(999, Math.floor(Number(e.target.value)) || 0));
+      state.rule[id] = n; save();
+      Array.prototype.forEach.call(document.querySelectorAll(".gname"), function (el) { el.textContent = groupLabel(); });
+      render();
+    });
+  });
+
+  $("drawBtn").addEventListener("click", draw);
+  $("undoBtn").addEventListener("click", undo);
+  $("copyBtn").addEventListener("click", copyWinners);
+  $("resetBtn").addEventListener("click", function () {
+    askConfirm("Clear all participants and winners?", function () {
+      var rule = state.rule;
+      state = freshState();
+      state.rule = rule;
+      $("copyFallback").hidden = true;
+      $("copyStatus").hidden = true;
+      setStatus("");
+      save();
+      setReel("Add names to begin");
+      $("undoBtn").hidden = true;
+      renderAll();
+    });
+  });
+  $("fullscreenBtn").addEventListener("click", function () {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (document.documentElement.requestFullscreen) {
+        var p = document.documentElement.requestFullscreen();
+        if (p && p.catch) p.catch(function () { /* not allowed here */ });
+      }
+    } catch (e) { /* not allowed here */ }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" && (e.target === document.body || e.target === document.documentElement)) { e.preventDefault(); draw(); }
+  });
+
+  if (load()) {
+    var last = state.winners[state.winners.length - 1];
+    if (last) setReel(last.name, last.group);
+    if (!state.sample) setStatus("Picked up where you left off: " + state.participants.length + " participants.", "ok");
+    renderAll();
+  } else {
+    commitRows(SAMPLE_ROWS, "sample", { sample: true });
+  }
+})();
+</script>

@@ -188,6 +188,22 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   @media (prefers-reduced-motion: reduce) {
     .reel.winner { animation: none; }
   }
+  .side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .fields { display: flex; flex-direction: column; gap: 10px; }
+  .segmented { display: flex; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; }
+  .segmented label { flex: 1; text-align: center; padding: 7px 8px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .9rem; }
+  .segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .segmented label:has(input:checked) { background: var(--red); color: var(--red-ink); }
+  .segmented label:has(input:focus-visible) { outline: 3px solid var(--gold); outline-offset: 1px; }
+  .quota-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .quota-row input { width: 5.5em; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+  .slots { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .slot { font-family: var(--font-mono); font-size: .8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .slot.full { border-color: var(--gold); color: var(--ink); background: color-mix(in srgb, var(--gold) 16%, transparent); }
+  .reel-group { margin-top: -8px; min-height: 1.5em; font-family: var(--font-mono); font-size: .9rem; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+  .winners .who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+  .tag { font-family: var(--font-mono); font-size: .7rem; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.in { border-color: var(--red); color: var(--red); }
 </style>
 </head>
 <body>
@@ -210,42 +226,77 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   </div>
 
   <main class="layout">
-    <section class="panel">
-      <h2>Participants</h2>
-      <label class="drop" id="dropZone">
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.ods">
-        <strong>Upload Excel file</strong>
-        <span class="muted small">.xlsx, .xls or .csv. Click or drag &amp; drop.</span>
-      </label>
-      <p class="sample-note">Offline version: your file is read on this computer only. Nothing is uploaded.</p>
-      <p class="muted small">Need a starting point? <button class="link-btn" id="templateBtn" type="button">Download template</button></p>
-      <p class="muted small">Names are read from the first sheet. Put one name per row; a header such as "Name" is fine.</p>
-
-      <div id="columnPicker" hidden>
-        <label class="field">Name column
-          <select id="columnSelect"></select>
+    <div class="side">
+      <section class="panel">
+        <h2>Participants</h2>
+        <label class="drop" id="dropZone">
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.ods">
+          <strong>Upload Excel file</strong>
+          <span class="muted small">.xlsx, .xls or .csv. Click or drag &amp; drop.</span>
         </label>
-        <label class="check" style="margin-top:8px"><input type="checkbox" id="headerCheck" checked> First row is a header</label>
-      </div>
+        <p class="sample-note">Offline version: your file is read on this computer only. Nothing is uploaded.</p>
+        <p class="muted small">Need a starting point? <button class="link-btn" id="templateBtn" type="button">Download template</button></p>
+        <p class="muted small">Names are read from the first sheet: one person per row, with a column for their group (for example "Department") if you want to use the group rule.</p>
 
-      <details>
-        <summary>Or paste names</summary>
-        <textarea id="pasteInput" rows="6" placeholder="One name per line"></textarea>
-        <button class="btn" id="pasteBtn" type="button">Use pasted names</button>
-      </details>
+        <div id="columnPicker" class="fields" hidden>
+          <label class="field">Name column
+            <select id="columnSelect"></select>
+          </label>
+          <label class="field">Group column
+            <select id="groupColSelect"></select>
+          </label>
+          <label class="check"><input type="checkbox" id="headerCheck" checked> First row is a header</label>
+        </div>
 
-      <label class="check"><input type="checkbox" id="dedupeCheck" checked> Remove duplicate names</label>
-      <p id="sampleNote" class="sample-note" hidden>Showing sample names so you can try a draw. Upload your list to replace them.</p>
-      <p id="loadStatus" class="status" role="status"></p>
-    </section>
+        <details>
+          <summary>Or paste names</summary>
+          <p class="muted small">One person per line. To include the group, copy two columns from Excel, or type "Name, Group".</p>
+          <textarea id="pasteInput" rows="6" placeholder="Aisha Rahman, ECSO&#10;Ben Lee, Finance"></textarea>
+          <button class="btn" id="pasteBtn" type="button">Use pasted names</button>
+        </details>
+
+        <label class="check"><input type="checkbox" id="dedupeCheck" checked> Remove duplicate names</label>
+        <p id="sampleNote" class="sample-note" hidden>Showing sample names so you can try a draw. Upload your list to replace them.</p>
+        <p id="loadStatus" class="status" role="status"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Draw rule</h2>
+        <div class="segmented" role="radiogroup" aria-label="Draw rule">
+          <label><input type="radio" name="mode" id="modeQuota" value="quota" checked> By group</label>
+          <label><input type="radio" name="mode" id="modeUnlimited" value="unlimited"> No limit</label>
+        </div>
+        <div id="quotaFields" class="fields">
+          <label class="field">Group
+            <select id="groupValueSelect"></select>
+          </label>
+          <div class="quota-row">
+            <label class="field" for="quotaIn">Winners from <span class="gname">ECSO</span></label>
+            <input type="number" id="quotaIn" min="0" max="999" value="2">
+          </div>
+          <div class="quota-row">
+            <label class="field" for="quotaOut">Winners from non-<span class="gname">ECSO</span></label>
+            <input type="number" id="quotaOut" min="0" max="999" value="1">
+          </div>
+          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled.</p>
+        </div>
+        <p class="muted small" id="unlimitedHelp" hidden>Each round picks one name at random from everyone left. Keep drawing as long as you like.</p>
+        <p id="ruleWarn" class="status err" hidden></p>
+      </section>
+    </div>
 
     <section class="panel stage">
       <div class="counts">
         <span><b id="poolCount">0</b>in the pool</span>
         <span><b id="winnerCount">0</b>winners</span>
       </div>
+      <div class="slots" id="slots" hidden>
+        <span class="slot" id="slotIn"></span>
+        <span class="slot" id="slotOut"></span>
+      </div>
       <div class="round" id="roundLabel">Round 1</div>
       <div class="reel" id="reel" aria-live="polite">Ready</div>
+      <div class="reel-group" id="reelGroup"></div>
       <button class="btn primary big" id="drawBtn" type="button" disabled>Draw winner</button>
       <p class="hint muted">or press Space</p>
       <button class="link-btn" id="undoBtn" type="button" hidden>Undo last draw</button>
@@ -274,14 +325,23 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "luckyDraw.offline.v1";
-  var SAMPLE = ["Aisha Rahman", "Ben Lee", "Chandra Kumar", "Daniel Wong", "Elena Petrova",
-    "Farid Hassan", "Grace Lim", "Hiro Tanaka", "Isabel Cruz", "Jamal Osei", "Kavya Nair", "Liam O'Brien"];
+  var STORAGE_KEY = "luckyDraw.offline.v2";
+  var SAMPLE_ROWS = [["Name", "Department"],
+    ["Aisha Rahman", "ECSO"], ["Ben Lee", "Finance"], ["Chandra Kumar", "ECSO"], ["Daniel Wong", "HR"],
+    ["Elena Petrova", "ECSO"], ["Farid Hassan", "IT"], ["Grace Lim", "ECSO"], ["Hiro Tanaka", "Finance"],
+    ["Isabel Cruz", "ECSO"], ["Jamal Osei", "Operations"], ["Kavya Nair", "ECSO"], ["Liam O'Brien", "HR"]];
+  var GROUP_HEADER = /dept|department|group|division|unit|team|section|category|bu\b/i;
   var $ = function (id) { return document.getElementById(id); };
 
-  // participants: everyone loaded; pool: not yet drawn; winners: [{ name, round, time }]
-  var state = { participants: [], pool: [], winners: [], sample: false };
-  var sheetRows = null;
+  function freshState() {
+    return {
+      participants: [], pool: [], winners: [], sample: false,
+      rows: null, nameCol: 0, groupCol: -1, header: true,
+      rule: { mode: "quota", group: "ECSO", quotaIn: 2, quotaOut: 1 }
+    };
+  }
+  // participants/pool: [{ name, group }]; winners: [{ name, group, round, time }]
+  var state = freshState();
   var drawing = false;
 
   function save() {
@@ -291,7 +351,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     try {
       var saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (saved && Array.isArray(saved.pool) && Array.isArray(saved.winners) && (saved.pool.length || saved.winners.length)) {
-        state = saved;
+        state = Object.assign(freshState(), saved);
+        state.rule = Object.assign(freshState().rule, saved.rule);
         return true;
       }
     } catch (e) { /* ignore */ }
@@ -309,15 +370,21 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   // In-page confirmation (browser dialogs are unavailable here).
   var pendingYes = null;
-  function askConfirm(message, onYes) {
+  function askConfirm(message, onYes, onNo) {
     $("confirmText").textContent = message;
-    pendingYes = onYes;
+    pendingYes = { yes: onYes, no: onNo };
     $("confirmBox").hidden = false;
     $("confirmYes").focus();
   }
-  function closeConfirm() { $("confirmBox").hidden = true; pendingYes = null; }
-  $("confirmYes").addEventListener("click", function () { var f = pendingYes; closeConfirm(); if (f) f(); });
-  $("confirmNo").addEventListener("click", closeConfirm);
+  function closeConfirm(answer) {
+    var p = pendingYes;
+    $("confirmBox").hidden = true;
+    pendingYes = null;
+    if (p && answer && p.yes) p.yes();
+    if (p && !answer && p.no) p.no();
+  }
+  $("confirmYes").addEventListener("click", function () { closeConfirm(true); });
+  $("confirmNo").addEventListener("click", function () { closeConfirm(false); });
 
   function setStatus(msg, kind) {
     var el = $("loadStatus");
@@ -325,64 +392,147 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     el.className = "status" + (kind ? " " + kind : "");
   }
 
-  function cleanNames(list) {
-    var names = list.map(function (n) { return String(n == null ? "" : n).trim(); })
-      .filter(function (n) { return n.length > 0; });
-    if ($("dedupeCheck").checked) {
-      var seen = {};
-      names = names.filter(function (n) {
-        var key = n.toLowerCase();
-        if (seen[key]) return false;
-        seen[key] = true;
-        return true;
-      });
-    }
-    return names;
+  // ---------- Groups and the draw rule ----------
+  function norm(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
+  function hasGroups() { return state.groupCol >= 0; }
+  function quotaActive() { return state.rule.mode === "quota" && hasGroups(); }
+  function inGroup(p) { return norm(p.group) === norm(state.rule.group); }
+  function groupLabel() { return state.rule.group || "group"; }
+
+  function winnersIn() { return state.winners.filter(inGroup).length; }
+  function quotaTotal() { return state.rule.quotaIn + state.rule.quotaOut; }
+
+  // Names that can win this round.
+  function eligible() {
+    if (!quotaActive()) return state.pool;
+    var wonIn = winnersIn(), wonOut = state.winners.length - wonIn;
+    return state.pool.filter(function (p) {
+      return inGroup(p) ? wonIn < state.rule.quotaIn : wonOut < state.rule.quotaOut;
+    });
   }
 
-  function applyNames(names, source, isSample) {
-    state = { participants: names.slice(), pool: names.slice(), winners: [], sample: !!isSample };
-    save();
-    if (!isSample) setStatus("Loaded " + names.length + " names from " + source + ".", "ok");
-    setReel("Ready");
-    $("undoBtn").hidden = true;
-    render();
+  function groupValues() {
+    var seen = {}, out = [];
+    state.participants.forEach(function (p) {
+      var g = String(p.group || "").trim();
+      if (g && !seen[norm(g)]) { seen[norm(g)] = true; out.push(g); }
+    });
+    return out.sort(function (a, b) { return a.localeCompare(b); });
   }
 
-  function useNames(names, source) {
-    if (!names.length) { setStatus("No names found in " + source + ". Check that the names are in the first sheet.", "err"); return; }
-    if (state.winners.length && !state.sample) {
-      askConfirm("Loading a new list clears the " + state.winners.length + " winners drawn so far. Continue?", function () {
-        applyNames(names, source);
-      });
-      return;
-    }
-    applyNames(names, source);
+  // ---------- Loading names ----------
+  function buildParticipants() {
+    var rows = state.header ? state.rows.slice(1) : state.rows;
+    var seen = {}, dedupe = $("dedupeCheck").checked, out = [];
+    rows.forEach(function (r) {
+      var name = String(r[state.nameCol] == null ? "" : r[state.nameCol]).trim();
+      if (!name) return;
+      if (dedupe) { if (seen[norm(name)]) return; seen[norm(name)] = true; }
+      out.push({ name: name, group: state.groupCol >= 0 ? String(r[state.groupCol] == null ? "" : r[state.groupCol]).trim() : "" });
+    });
+    return out;
   }
 
-  function namesFromRows() {
-    var col = Number($("columnSelect").value) || 0;
-    var rows = $("headerCheck").checked ? sheetRows.slice(1) : sheetRows;
-    return cleanNames(rows.map(function (r) { return r[col]; }));
-  }
-
-  function buildColumnPicker() {
-    var header = sheetRows[0] || [];
-    var width = sheetRows.reduce(function (w, r) { return Math.max(w, r.length); }, 0);
-    var select = $("columnSelect");
-    select.innerHTML = "";
-    var guess = -1;
+  function guessColumns(rows) {
+    var header = rows[0] || [];
+    var width = rows.reduce(function (w, r) { return Math.max(w, r.length); }, 0);
+    var nameCol = -1, groupCol = -1, groupByValue = -1;
     for (var i = 0; i < width; i++) {
       var label = String(header[i] || "").trim();
-      var opt = document.createElement("option");
-      opt.value = i;
-      opt.textContent = "Column " + XLSX.utils.encode_col(i) + (label ? " (" + label + ")" : "");
-      select.appendChild(opt);
-      if (guess < 0 && /name/i.test(label)) guess = i;
+      if (nameCol < 0 && /name/i.test(label)) nameCol = i;
+      if (groupCol < 0 && GROUP_HEADER.test(label)) groupCol = i;
+      if (groupByValue < 0 && rows.some(function (r) { return norm(r[i]) === norm(state.rule.group || "ECSO"); })) groupByValue = i;
     }
-    select.value = Math.max(guess, 0);
-    $("headerCheck").checked = /name|participant|staff|employee|member/i.test(header.join(" "));
-    $("columnPicker").hidden = width <= 1 && !$("headerCheck").checked;
+    var looksLikeHeader = /name|participant|staff|employee|member|dept|department|group/i.test(header.join(" "));
+    if (groupByValue >= 0 && groupByValue !== nameCol) groupCol = groupByValue;
+    if (nameCol < 0) nameCol = groupCol === 0 && width > 1 ? 1 : 0;
+    if (groupCol === nameCol) groupCol = -1;
+    return { width: width, nameCol: nameCol, groupCol: groupCol, header: looksLikeHeader };
+  }
+
+  function fillColumnSelects() {
+    var rows = state.rows || [];
+    var header = rows[0] || [];
+    var width = rows.reduce(function (w, r) { return Math.max(w, r.length); }, 0);
+    var nameSel = $("columnSelect"), groupSel = $("groupColSelect");
+    nameSel.innerHTML = ""; groupSel.innerHTML = "";
+    var none = document.createElement("option");
+    none.value = -1; none.textContent = "None";
+    groupSel.appendChild(none);
+    for (var i = 0; i < width; i++) {
+      var label = state.header ? String(header[i] || "").trim() : "";
+      var text = "Column " + colLetter(i) + (label ? " (" + label + ")" : "");
+      [nameSel, groupSel].forEach(function (sel) {
+        var opt = document.createElement("option");
+        opt.value = i; opt.textContent = text; sel.appendChild(opt);
+      });
+    }
+    nameSel.value = state.nameCol;
+    groupSel.value = state.groupCol;
+    $("headerCheck").checked = state.header;
+    $("columnPicker").hidden = !rows.length;
+  }
+
+  function colLetter(i) {
+    var s = "";
+    for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s;
+    return s;
+  }
+
+  function pickDefaultGroupValue() {
+    var values = groupValues();
+    var match = values.filter(function (v) { return norm(v) === norm(state.rule.group); })[0];
+    if (match) state.rule.group = match;
+    else if (values.length) state.rule.group = values[0];
+  }
+
+  // Replace the participant list, asking first if a draw is under way.
+  function commitRows(rows, source, opts) {
+    opts = opts || {};
+    var apply = function () {
+      var prevRule = state.rule;
+      state = Object.assign(freshState(), { rows: rows, sample: !!opts.sample, rule: prevRule });
+      var g = guessColumns(rows);
+      state.nameCol = g.nameCol; state.groupCol = g.groupCol; state.header = g.header;
+      state.participants = buildParticipants();
+      if (!state.participants.length) {
+        setStatus("No names found in " + source + ". Check that the names are in the first sheet.", "err");
+        state.participants = []; save(); renderAll(); return;
+      }
+      state.pool = state.participants.slice();
+      pickDefaultGroupValue();
+      save();
+      if (!opts.sample) {
+        var groups = hasGroups() ? " Groups read from column " + colLetter(state.groupCol) + "." : " No group column found.";
+        setStatus("Loaded " + state.participants.length + " names from " + source + "." + groups, "ok");
+      }
+      setReel("Ready");
+      $("undoBtn").hidden = true;
+      renderAll();
+    };
+    if (state.winners.length && !state.sample) {
+      askConfirm("Loading a new list clears the " + state.winners.length + " winners drawn so far. Continue?", apply);
+    } else apply();
+  }
+
+  // Re-read the current rows after a column or header change.
+  function rebuildFromRows() {
+    var apply = function () {
+      state.participants = buildParticipants();
+      state.pool = state.participants.slice();
+      state.winners = [];
+      pickDefaultGroupValue();
+      save();
+      setReel("Ready");
+      $("undoBtn").hidden = true;
+      setStatus(state.participants.length + " names ready.", "ok");
+      renderAll();
+    };
+    if (state.winners.length && !state.sample) {
+      askConfirm("Changing columns clears the " + state.winners.length + " winners drawn so far. Continue?", apply, function () {
+        fillColumnSelects();
+      });
+    } else apply();
   }
 
   function readFile(file) {
@@ -396,9 +546,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       try {
         var wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
         var ws = wb.Sheets[wb.SheetNames[0]];
-        sheetRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false });
-        buildColumnPicker();
-        useNames(namesFromRows(), file.name);
+        commitRows(XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", blankrows: false }), file.name);
       } catch (err) {
         setStatus("Couldn't read that file. Save it as .xlsx or .csv and try again.", "err");
       }
@@ -406,39 +554,51 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     reader.readAsArrayBuffer(file);
   }
 
-  function setReel(text) {
+  function parsePasted(text) {
+    return text.split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (line) {
+      var parts = line.indexOf("\t") >= 0 ? line.split("\t") : line.split(",");
+      return parts.map(function (s) { return s.trim(); });
+    });
+  }
+
+  // ---------- Drawing ----------
+  function setReel(text, group) {
     var reel = $("reel");
     reel.textContent = text;
     reel.classList.remove("winner", "spinning");
+    $("reelGroup").textContent = group || "";
   }
 
   function draw() {
-    if (drawing || !state.pool.length) return;
+    if (drawing) return;
+    var choices = eligible();
+    if (!choices.length) return;
     drawing = true;
-    closeConfirm();
+    closeConfirm(false);
     $("drawBtn").disabled = true;
     $("undoBtn").hidden = true;
 
-    var winnerIdx = randomIndex(state.pool.length);
-    var winner = state.pool[winnerIdx];
+    var winner = choices[randomIndex(choices.length)];
     var reel = $("reel");
     reel.classList.remove("winner");
     reel.classList.add("spinning");
+    $("reelGroup").textContent = "";
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     var delay = reduce ? 400 : 40;
     (function tick() {
       if (delay < 380) {
-        reel.textContent = state.pool[randomIndex(state.pool.length)];
+        reel.textContent = choices[randomIndex(choices.length)].name;
         delay *= 1.12;
         setTimeout(tick, delay);
         return;
       }
-      state.pool.splice(winnerIdx, 1);
-      state.winners.push({ name: winner, round: state.winners.length + 1, time: new Date().toISOString() });
+      state.pool.splice(state.pool.indexOf(winner), 1);
+      state.winners.push({ name: winner.name, group: winner.group, round: state.winners.length + 1, time: new Date().toISOString() });
       save();
       reel.classList.remove("spinning");
-      reel.textContent = winner;
+      reel.textContent = winner.name;
+      $("reelGroup").textContent = winner.group;
       void reel.offsetWidth;
       reel.classList.add("winner");
       if (!reduce) confetti();
@@ -451,7 +611,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function undo() {
     var last = state.winners.pop();
     if (!last) return;
-    state.pool.push(last.name);
+    state.pool.push({ name: last.name, group: last.group });
     save();
     setReel(last.name + " is back in the pool");
     $("undoBtn").hidden = true;
@@ -461,8 +621,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function pad(n) { return String(n).padStart(3, "0"); }
 
   function copyWinners() {
-    var lines = ["Round\tWinner\tDrawn at"].concat(state.winners.map(function (w) {
-      return w.round + "\t" + w.name + "\t" + new Date(w.time).toLocaleString();
+    var lines = ["Round\tWinner\tGroup\tDrawn at"].concat(state.winners.map(function (w) {
+      return w.round + "\t" + w.name + "\t" + (w.group || "") + "\t" + new Date(w.time).toLocaleString();
     }));
     var text = lines.join("\n");
     var status = $("copyStatus");
@@ -486,9 +646,28 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     } catch (e) { showFallback(); }
   }
 
+  // ---------- Rendering ----------
+  function renderRule() {
+    var groupsOk = hasGroups();
+    $("modeQuota").checked = state.rule.mode === "quota";
+    $("modeUnlimited").checked = state.rule.mode !== "quota";
+    $("quotaFields").hidden = state.rule.mode !== "quota";
+    $("unlimitedHelp").hidden = state.rule.mode === "quota";
+    var sel = $("groupValueSelect");
+    sel.innerHTML = "";
+    groupValues().forEach(function (v) {
+      var opt = document.createElement("option"); opt.value = v; opt.textContent = v; sel.appendChild(opt);
+    });
+    sel.value = state.rule.group;
+    sel.disabled = !groupsOk;
+    $("quotaIn").value = state.rule.quotaIn;
+    $("quotaOut").value = state.rule.quotaOut;
+    Array.prototype.forEach.call(document.querySelectorAll(".gname"), function (el) { el.textContent = groupLabel(); });
+  }
+
   function exportWinners() {
     var rows = state.winners.map(function (w) {
-      return { Round: w.round, Winner: w.name, "Drawn at": new Date(w.time).toLocaleString() };
+      return { Round: w.round, Winner: w.name, Group: w.group || "", "Drawn at": new Date(w.time).toLocaleString() };
     });
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Winners");
@@ -497,42 +676,84 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   function downloadTemplate() {
     var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Name"], ["Alice Tan"], ["Ben Lee"], ["Chandra Kumar"]]), "Participants");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Name", "Department"], ["Alice Tan", "ECSO"], ["Ben Lee", "Finance"], ["Chandra Kumar", "ECSO"], ["Daniel Wong", "HR"]]), "Participants");
     XLSX.writeFile(wb, "lucky-draw-template.xlsx");
   }
 
   function render() {
-    var hasPool = state.pool.length > 0;
+    var choices = eligible();
+    var quota = quotaActive();
+    var total = quotaTotal();
+    var wonIn = winnersIn(), wonOut = state.winners.length - wonIn;
+    var canDraw = choices.length > 0;
+
     $("poolCount").textContent = state.pool.length;
     $("poolCount2").textContent = state.pool.length;
     $("winnerCount").textContent = state.winners.length;
-    $("drawBtn").disabled = drawing || !hasPool;
+    $("drawBtn").disabled = drawing || !canDraw;
     $("drawBtn").textContent = state.winners.length ? "Draw next winner" : "Draw winner";
     $("copyBtn").disabled = !state.winners.length;
     $("exportBtn").disabled = !state.winners.length;
     $("sampleNote").hidden = !state.sample;
-    $("roundLabel").textContent = hasPool
-      ? "Round " + pad(state.winners.length + 1)
-      : (state.participants.length ? "Every name has been drawn" : "Add names to begin");
+
+    $("slots").hidden = !quota;
+    if (quota) {
+      $("slotIn").textContent = groupLabel() + " " + wonIn + " of " + state.rule.quotaIn;
+      $("slotOut").textContent = "Non-" + groupLabel() + " " + wonOut + " of " + state.rule.quotaOut;
+      $("slotIn").classList.toggle("full", wonIn >= state.rule.quotaIn);
+      $("slotOut").classList.toggle("full", wonOut >= state.rule.quotaOut);
+    }
+
+    var label;
+    if (!state.participants.length) label = "Add names to begin";
+    else if (canDraw) label = "Round " + pad(state.winners.length + 1) + (quota ? " of " + pad(total) : "");
+    else if (quota && wonIn >= state.rule.quotaIn && wonOut >= state.rule.quotaOut) label = "All " + total + " winners drawn";
+    else if (quota) label = "No eligible names left";
+    else label = "Every name has been drawn";
+    $("roundLabel").textContent = label;
     if (!state.participants.length && !drawing) setReel("Add names to begin");
+
+    // Warn when a group can't fill its slots.
+    var warn = "";
+    if (state.rule.mode === "quota" && state.participants.length) {
+      if (!hasGroups()) warn = "Choose a group column under Participants to use this rule. Until then, everyone is drawn with no limit.";
+      else {
+        var leftIn = state.pool.filter(inGroup).length, leftOut = state.pool.length - leftIn;
+        var needIn = Math.max(0, state.rule.quotaIn - wonIn), needOut = Math.max(0, state.rule.quotaOut - wonOut);
+        if (leftIn < needIn) warn = "Only " + leftIn + " " + groupLabel() + " " + (leftIn === 1 ? "name is" : "names are") + " left for " + needIn + " " + groupLabel() + " slots.";
+        else if (leftOut < needOut) warn = "Only " + leftOut + " non-" + groupLabel() + " " + (leftOut === 1 ? "name is" : "names are") + " left for " + needOut + " slots.";
+      }
+    }
+    $("ruleWarn").textContent = warn;
+    $("ruleWarn").hidden = !warn;
 
     var list = $("winnerList");
     list.innerHTML = "";
     state.winners.slice().reverse().forEach(function (w) {
       var li = document.createElement("li");
       var no = document.createElement("span"); no.className = "no"; no.textContent = "No. " + pad(w.round);
+      var who = document.createElement("span"); who.className = "who";
       var name = document.createElement("span"); name.className = "name"; name.textContent = w.name;
+      who.appendChild(name);
+      if (w.group) {
+        var tag = document.createElement("span");
+        tag.className = "tag" + (inGroup(w) ? " in" : "");
+        tag.textContent = w.group;
+        who.appendChild(tag);
+      }
       var time = document.createElement("span"); time.className = "time";
       time.textContent = new Date(w.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      li.append(no, name, time);
+      li.append(no, who, time);
       list.appendChild(li);
     });
     $("noWinners").hidden = state.winners.length > 0;
 
     var pool = $("poolList");
     pool.innerHTML = "";
-    state.pool.slice(0, 500).forEach(function (n) {
-      var li = document.createElement("li"); li.textContent = n; pool.appendChild(li);
+    state.pool.slice(0, 500).forEach(function (p) {
+      var li = document.createElement("li");
+      li.textContent = p.name + (p.group ? " (" + p.group + ")" : "");
+      pool.appendChild(li);
     });
     if (state.pool.length > 500) {
       var more = document.createElement("li");
@@ -541,6 +762,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       pool.appendChild(more);
     }
   }
+
+  function renderAll() { fillColumnSelects(); renderRule(); render(); }
 
   function confetti() {
     var canvas = $("confetti");
@@ -569,6 +792,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     })();
   }
 
+  // ---------- Wiring ----------
   $("fileInput").addEventListener("change", function (e) { readFile(e.target.files[0]); e.target.value = ""; });
   var drop = $("dropZone");
   ["dragenter", "dragover"].forEach(function (t) {
@@ -579,12 +803,28 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   });
   drop.addEventListener("drop", function (e) { readFile(e.dataTransfer.files[0]); });
 
-  function reloadFromSheet() { if (sheetRows) useNames(namesFromRows(), "the selected column"); }
-  $("columnSelect").addEventListener("change", reloadFromSheet);
-  $("headerCheck").addEventListener("change", reloadFromSheet);
+  $("columnSelect").addEventListener("change", function (e) { state.nameCol = Number(e.target.value); rebuildFromRows(); });
+  $("groupColSelect").addEventListener("change", function (e) { state.groupCol = Number(e.target.value); rebuildFromRows(); });
+  $("headerCheck").addEventListener("change", function (e) { state.header = e.target.checked; rebuildFromRows(); });
+  $("dedupeCheck").addEventListener("change", function () { if (state.rows) rebuildFromRows(); });
   $("pasteBtn").addEventListener("click", function () {
-    useNames(cleanNames($("pasteInput").value.split(/\r?\n/)), "pasted text");
+    var rows = parsePasted($("pasteInput").value);
+    if (!rows.length) { setStatus("Paste at least one name first.", "err"); return; }
+    commitRows(rows, "pasted text");
   });
+
+  $("modeQuota").addEventListener("change", function () { state.rule.mode = "quota"; save(); renderRule(); render(); });
+  $("modeUnlimited").addEventListener("change", function () { state.rule.mode = "unlimited"; save(); renderRule(); render(); });
+  $("groupValueSelect").addEventListener("change", function (e) { state.rule.group = e.target.value; save(); renderRule(); render(); });
+  ["quotaIn", "quotaOut"].forEach(function (id) {
+    $(id).addEventListener("input", function (e) {
+      var n = Math.max(0, Math.min(999, Math.floor(Number(e.target.value)) || 0));
+      state.rule[id] = n; save();
+      Array.prototype.forEach.call(document.querySelectorAll(".gname"), function (el) { el.textContent = groupLabel(); });
+      render();
+    });
+  });
+
   $("drawBtn").addEventListener("click", draw);
   $("undoBtn").addEventListener("click", undo);
   $("copyBtn").addEventListener("click", copyWinners);
@@ -592,16 +832,16 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   $("templateBtn").addEventListener("click", downloadTemplate);
   $("resetBtn").addEventListener("click", function () {
     askConfirm("Clear all participants and winners?", function () {
-      sheetRows = null;
-      $("columnPicker").hidden = true;
+      var rule = state.rule;
+      state = freshState();
+      state.rule = rule;
       $("copyFallback").hidden = true;
       $("copyStatus").hidden = true;
       setStatus("");
-      state = { participants: [], pool: [], winners: [], sample: false };
       save();
       setReel("Add names to begin");
       $("undoBtn").hidden = true;
-      render();
+      renderAll();
     });
   });
   $("fullscreenBtn").addEventListener("click", function () {
@@ -618,11 +858,12 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   });
 
   if (load()) {
-    if (state.winners.length) setReel(state.winners[state.winners.length - 1].name);
+    var last = state.winners[state.winners.length - 1];
+    if (last) setReel(last.name, last.group);
     if (!state.sample) setStatus("Picked up where you left off: " + state.participants.length + " participants.", "ok");
-    render();
+    renderAll();
   } else {
-    applyNames(SAMPLE, "sample", true);
+    commitRows(SAMPLE_ROWS, "sample", { sample: true });
   }
 })();
 </script>
