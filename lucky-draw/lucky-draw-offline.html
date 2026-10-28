@@ -164,7 +164,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
   .winners { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow: auto; }
   .winners li {
-    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center;
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
     padding: 10px 12px; border: 1px solid var(--line); border-left: 0; border-radius: 0 6px 6px 0;
     background: linear-gradient(90deg, var(--red) 0 6px, transparent 6px);
     padding-left: 18px;
@@ -172,6 +172,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .winners .no { font-family: var(--font-mono); font-size: .8rem; color: var(--gold); font-variant-numeric: tabular-nums; }
   .winners .name { font-weight: 700; overflow-wrap: anywhere; }
   .winners .time { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); }
+  .winners li.absent { background: linear-gradient(90deg, var(--line) 0 6px, transparent 6px); }
+  .winners li.absent .name { color: var(--muted); font-weight: 600; }
+  .winners li.absent .nm { text-decoration: line-through; }
+  .winners .note { display: block; font-size: .75rem; color: var(--muted); font-weight: 400; text-decoration: none; }
+  .btn.mini { font-size: .75rem; padding: 3px 8px; border-radius: 4px; font-weight: 600; }
   .pool { max-height: 30vh; overflow: auto; padding-left: 20px; margin: 0; font-size: .9rem; }
 
   /* In-page confirm */
@@ -278,9 +283,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
             <input type="number" id="quotaOut" min="0" max="999" value="1">
           </div>
           <p class="progress" id="ruleProgress"></p>
-          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled. Groups are never shown on the draw screen; use Audience view to hide these settings while presenting.</p>
+          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled. If a winner isn't here, click Not available next to their name: the next draw replaces them from the same group. Groups are never shown on the draw screen; use Audience view to hide these settings while presenting.</p>
         </div>
-        <p class="muted small" id="unlimitedHelp" hidden>Each round picks one name at random from everyone left. Keep drawing as long as you like.</p>
+        <p class="muted small" id="unlimitedHelp" hidden>Each round picks one name at random from everyone left. Keep drawing as long as you like. If a winner isn't here, click Not available next to their name and draw a replacement.</p>
         <p id="ruleWarn" class="status err" hidden></p>
       </section>
     </div>
@@ -330,12 +335,14 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   function freshState() {
     return {
-      participants: [], pool: [], winners: [], sample: false,
+      participants: [], pool: [], winners: [], pending: [], sample: false,
       rows: null, nameCol: 0, groupCol: -1, header: true,
       rule: { mode: "quota", group: "ECSO", quotaIn: 2, quotaOut: 1 }
     };
   }
-  // participants/pool: [{ name, group }]; winners: [{ name, group, round, time }]
+  // participants/pool: [{ name, group }]
+  // winners: [{ name, group, round, time, absent?, replaces?: { round, side } }]
+  // pending: replacements still to draw, oldest first: [{ round, side: "in" | "out" | "any" }]
   var state = freshState();
   var drawing = false;
 
@@ -348,6 +355,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       if (saved && Array.isArray(saved.pool) && Array.isArray(saved.winners) && (saved.pool.length || saved.winners.length)) {
         state = Object.assign(freshState(), saved);
         state.rule = Object.assign(freshState().rule, saved.rule);
+        if (!Array.isArray(state.pending)) state.pending = [];
         return true;
       }
     } catch (e) { /* ignore */ }
@@ -394,12 +402,20 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function inGroup(p) { return norm(p.group) === norm(state.rule.group); }
   function groupLabel() { return state.rule.group || "group"; }
 
-  function winnersIn() { return state.winners.filter(inGroup).length; }
+  // Winners who claimed their prize (not marked unavailable).
+  function present() { return state.winners.filter(function (w) { return !w.absent; }); }
+  function winnersIn() { return present().filter(inGroup).length; }
+  function sideOf(p) { return quotaActive() ? (inGroup(p) ? "in" : "out") : "any"; }
 
-  // Names that can win this round.
+  // Names that can win this round. A pending replacement comes from the same side of the rule.
   function eligible() {
+    if (state.pending.length) {
+      var side = state.pending[0].side;
+      if (side === "any" || !hasGroups()) return state.pool;
+      return state.pool.filter(function (p) { return (side === "in") === inGroup(p); });
+    }
     if (!quotaActive()) return state.pool;
-    var wonIn = winnersIn(), wonOut = state.winners.length - wonIn;
+    var wonIn = winnersIn(), wonOut = present().length - wonIn;
     return state.pool.filter(function (p) {
       return inGroup(p) ? wonIn < state.rule.quotaIn : wonOut < state.rule.quotaOut;
     });
@@ -515,6 +531,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       state.participants = buildParticipants();
       state.pool = state.participants.slice();
       state.winners = [];
+      state.pending = [];
       pickDefaultGroupValue();
       save();
       setReel("Ready");
@@ -586,7 +603,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
         return;
       }
       state.pool.splice(state.pool.indexOf(winner), 1);
-      state.winners.push({ name: winner.name, group: winner.group, round: state.winners.length + 1, time: new Date().toISOString() });
+      var record = { name: winner.name, group: winner.group, round: state.winners.length + 1, time: new Date().toISOString() };
+      if (state.pending.length) record.replaces = state.pending.shift();
+      state.winners.push(record);
       save();
       reel.classList.remove("spinning");
       reel.textContent = winner.name;
@@ -600,8 +619,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   }
 
   function undo() {
+    if (drawing) return;
     var last = state.winners.pop();
     if (!last) return;
+    if (last.absent) removePending(last.round);
+    if (last.replaces) state.pending.unshift(last.replaces);
     state.pool.push({ name: last.name, group: last.group });
     save();
     setReel(last.name + " is back in the pool");
@@ -609,11 +631,47 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     render();
   }
 
+  function removePending(round) {
+    state.pending = state.pending.filter(function (r) { return r.round !== round; });
+  }
+
+  // The winner isn't here: keep them out of the pool and queue a replacement from the same side.
+  function markAbsent(round) {
+    if (drawing) return;
+    var w = state.winners.filter(function (x) { return x.round === round; })[0];
+    if (!w || w.absent) return;
+    w.absent = true;
+    state.pending.push({ round: round, side: sideOf(w) });
+    save();
+    setReel("Drawing a replacement");
+    $("undoBtn").hidden = true;
+    render();
+  }
+
+  // Undo a "not available" mark, allowed until its replacement has been drawn.
+  function markPresent(round) {
+    if (drawing) return;
+    var w = state.winners.filter(function (x) { return x.round === round; })[0];
+    if (!w || !w.absent || !isPending(round)) return;
+    w.absent = false;
+    removePending(round);
+    save();
+    setReel(w.name);
+    render();
+  }
+
+  function isPending(round) { return state.pending.some(function (r) { return r.round === round; }); }
+
+  function statusOf(w) {
+    if (w.absent) return "Not available";
+    return w.replaces ? "Winner (replaces No. " + pad(w.replaces.round) + ")" : "Winner";
+  }
+
   function pad(n) { return String(n).padStart(3, "0"); }
 
   function copyWinners() {
-    var lines = ["Round\tWinner\tGroup\tDrawn at"].concat(state.winners.map(function (w) {
-      return w.round + "\t" + w.name + "\t" + (w.group || "") + "\t" + new Date(w.time).toLocaleString();
+    var lines = ["Round\tName\tGroup\tStatus\tDrawn at"].concat(state.winners.map(function (w) {
+      return w.round + "\t" + w.name + "\t" + (w.group || "") + "\t" + statusOf(w) + "\t" + new Date(w.time).toLocaleString();
     }));
     var text = lines.join("\n");
     var status = $("copyStatus");
@@ -630,7 +688,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     try {
       navigator.clipboard.writeText(text).then(function () {
         fallback.hidden = true;
-        status.textContent = "Copied " + state.winners.length + " winners. Paste into Excel.";
+        status.textContent = "Copied " + state.winners.length + " rows. Paste into Excel.";
         status.className = "status ok";
         status.hidden = false;
       }, showFallback);
@@ -658,7 +716,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   function exportWinners() {
     var rows = state.winners.map(function (w) {
-      return { Round: w.round, Winner: w.name, Group: w.group || "", "Drawn at": new Date(w.time).toLocaleString() };
+      return { Round: w.round, Name: w.name, Group: w.group || "", Status: statusOf(w), "Drawn at": new Date(w.time).toLocaleString() };
     });
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Winners");
@@ -674,20 +732,22 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   function render() {
     var choices = eligible();
     var quota = quotaActive();
-    var wonIn = winnersIn(), wonOut = state.winners.length - wonIn;
+    var wonIn = winnersIn(), wonOut = present().length - wonIn;
     var canDraw = choices.length > 0;
+    var replacing = state.pending.length > 0;
 
     $("poolCount").textContent = state.pool.length;
     $("poolCount2").textContent = state.pool.length;
-    $("winnerCount").textContent = state.winners.length;
+    $("winnerCount").textContent = present().length;
     $("drawBtn").disabled = drawing || !canDraw;
-    $("drawBtn").textContent = state.winners.length ? "Draw next winner" : "Draw winner";
+    $("drawBtn").textContent = replacing ? "Draw replacement" : (state.winners.length ? "Draw next winner" : "Draw winner");
     $("copyBtn").disabled = !state.winners.length;
     $("exportBtn").disabled = !state.winners.length;
     $("sampleNote").hidden = !state.sample;
 
     var label;
     if (!state.participants.length) label = "Add names to begin";
+    else if (replacing) label = canDraw ? "Replacement draw" : "No one left to draw a replacement from";
     else if (canDraw) label = "Round " + pad(state.winners.length + 1);
     else if (quota) label = "All winners drawn";
     else label = "Every name has been drawn";
@@ -695,7 +755,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     if (!state.participants.length && !drawing) setReel("Add names to begin");
 
     $("ruleProgress").textContent = quota
-      ? "Drawn so far: " + groupLabel() + " " + wonIn + " of " + state.rule.quotaIn + ", non-" + groupLabel() + " " + wonOut + " of " + state.rule.quotaOut
+      ? "Drawn so far: " + groupLabel() + " " + wonIn + " of " + state.rule.quotaIn + ", non-" + groupLabel() + " " + wonOut + " of " + state.rule.quotaOut +
+        (replacing ? ". Next draw is a replacement from " + (state.pending[0].side === "in" ? groupLabel() : "non-" + groupLabel()) + "." : "")
       : "";
 
     // Warn when a group can't fill its slots.
@@ -716,11 +777,25 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     list.innerHTML = "";
     state.winners.slice().reverse().forEach(function (w) {
       var li = document.createElement("li");
+      if (w.absent) li.className = "absent";
       var no = document.createElement("span"); no.className = "no"; no.textContent = "No. " + pad(w.round);
-      var name = document.createElement("span"); name.className = "name"; name.textContent = w.name;
+      var name = document.createElement("span"); name.className = "name";
+      var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = w.name;
+      name.appendChild(nm);
+      if (w.absent || w.replaces) {
+        var note = document.createElement("span"); note.className = "note";
+        note.textContent = w.absent ? "Not available" : "Replaces No. " + pad(w.replaces.round);
+        name.appendChild(note);
+      }
       var time = document.createElement("span"); time.className = "time";
       time.textContent = new Date(w.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      li.append(no, name, time);
+      var action = document.createElement("span");
+      if (!w.absent) {
+        action.appendChild(miniButton("Not available", "Mark " + w.name + " as not available and draw a replacement", function () { markAbsent(w.round); }));
+      } else if (isPending(w.round)) {
+        action.appendChild(miniButton("Undo", "Mark " + w.name + " as available again", function () { markPresent(w.round); }));
+      }
+      li.append(no, name, time, action);
       list.appendChild(li);
     });
     $("noWinners").hidden = state.winners.length > 0;
@@ -738,6 +813,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       more.textContent = "and " + (state.pool.length - 500) + " more";
       pool.appendChild(more);
     }
+  }
+
+  function miniButton(text, label, onClick) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "btn mini"; b.textContent = text;
+    b.setAttribute("aria-label", label);
+    b.disabled = drawing;
+    b.addEventListener("click", onClick);
+    return b;
   }
 
   function renderAll() { fillColumnSelects(); renderRule(); render(); }

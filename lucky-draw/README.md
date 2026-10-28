@@ -40,6 +40,17 @@ every slot is filled. Group names match regardless of capitals or extra spaces.
 
 In both modes a winner is removed from the pool, so nobody wins twice.
 
+### When a winner isn't available
+
+Click **Not available** next to the winner's name. They are crossed out, they
+don't go back into the pool, and the draw button changes to **Draw replacement**.
+The replacement always comes from the same side of the rule: an ECSO winner is
+replaced by someone from ECSO, a non-ECSO winner by someone from outside ECSO.
+There is no limit on how many replacements you can draw. *Undo* next to a
+crossed-out name reverses the mark until the replacement has been drawn. Copy
+and Export to Excel show each row's status (Winner, Not available, or which
+number a winner replaces).
+
 The rule is not shown to the audience: the draw screen, the winners list and the
 pool list never show anyone's group. The rule's progress (for example
 "ECSO 1 of 2, non-ECSO 0 of 1") appears only in the Draw rule settings. Click

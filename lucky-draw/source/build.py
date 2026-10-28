@@ -31,7 +31,7 @@ rep('<button class="btn" id="copyBtn" type="button" disabled>Copy winners</butto
 rep('$("copyBtn").disabled = !state.winners.length;', '$("copyBtn").disabled = !state.winners.length;\n    $("exportBtn").disabled = !state.winners.length;')
 rep('  function render() {', '''  function exportWinners() {
     var rows = state.winners.map(function (w) {
-      return { Round: w.round, Winner: w.name, Group: w.group || "", "Drawn at": new Date(w.time).toLocaleString() };
+      return { Round: w.round, Name: w.name, Group: w.group || "", Status: statusOf(w), "Drawn at": new Date(w.time).toLocaleString() };
     });
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Winners");
