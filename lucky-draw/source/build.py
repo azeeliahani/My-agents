@@ -46,7 +46,7 @@ rep('  function render() {', '''  function exportWinners() {
 
   function render() {''')
 rep('$("copyBtn").addEventListener("click", copyWinners);', '$("copyBtn").addEventListener("click", copyWinners);\n  $("exportBtn").addEventListener("click", exportWinners);\n  $("templateBtn").addEventListener("click", downloadTemplate);')
-rep('"luckyDraw.v3"', '"luckyDraw.offline.v3"')
+rep('"luckyDraw.v4"', '"luckyDraw.offline.v4"')
 out = head + src + '\n</body>\n</html>\n'
 open(sys.argv[2], 'w').write(out)
 print(len(out))

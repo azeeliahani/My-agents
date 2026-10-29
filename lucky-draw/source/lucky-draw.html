@@ -241,11 +241,11 @@
           </label>
           <div class="quota-row">
             <label class="field" for="quotaIn">Winners from <span class="gname">ECSO</span></label>
-            <input type="number" id="quotaIn" min="0" max="999" value="9">
+            <input type="number" id="quotaIn" min="0" max="999" value="8">
           </div>
           <div class="quota-row">
             <label class="field" for="quotaOut">Winners from non-<span class="gname">ECSO</span></label>
-            <input type="number" id="quotaOut" min="0" max="999" value="3">
+            <input type="number" id="quotaOut" min="0" max="999" value="4">
           </div>
           <p class="progress" id="ruleProgress"></p>
           <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled. Nobody can be drawn twice, even if you reload the list; only Start over clears the winners. If a winner isn't here, click Not available next to their name: the next draw replaces them from the same group. Groups are never shown on the draw screen; use Audience view to hide these settings while presenting.</p>
@@ -290,7 +290,7 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "luckyDraw.v3";
+  var STORAGE_KEY = "luckyDraw.v4";
   var SAMPLE_ROWS = [["Name", "Department"],
     ["Aisha Rahman", "ECSO"], ["Ben Lee", "Finance"], ["Chandra Kumar", "ECSO"], ["Daniel Wong", "HR"],
     ["Elena Petrova", "ECSO"], ["Farid Hassan", "IT"], ["Grace Lim", "ECSO"], ["Hiro Tanaka", "Finance"],
@@ -302,7 +302,7 @@
     return {
       participants: [], pool: [], winners: [], pending: [], sample: false,
       rows: null, nameCol: 0, groupCol: -1, header: true,
-      rule: { mode: "quota", group: "ECSO", quotaIn: 9, quotaOut: 3 }
+      rule: { mode: "quota", group: "ECSO", quotaIn: 8, quotaOut: 4 }
     };
   }
   // participants/pool: [{ name, group }]

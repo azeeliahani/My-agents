@@ -31,7 +31,7 @@ also paste names, with an optional group: copy two columns from Excel, or type
 
 ## Draw rules
 
-**By group** (default): 9 winners from ECSO and 3 from everyone else, 12 in total.
+**By group** (default): 8 winners from ECSO and 4 from everyone else, 12 in total.
 The group and both numbers can be changed. Each round picks one name at random
 from everyone whose group still has a winner slot open, and the draw stops when
 every slot is filled. Group names match regardless of capitals or extra spaces.
@@ -57,7 +57,7 @@ number a winner replaces).
 
 The rule is not shown to the audience: the draw screen, the winners list and the
 pool list never show anyone's group. The rule's progress (for example
-"ECSO 4 of 9, non-ECSO 1 of 3") appears only in the Draw rule settings. Click
+"ECSO 4 of 8, non-ECSO 1 of 4") appears only in the Draw rule settings. Click
 *Audience view* before presenting to hide all settings, and *Show settings* to
 bring them back. Copy and Export to Excel still include each winner's group for
 your records.
