@@ -225,7 +225,6 @@
           <button class="btn" id="pasteBtn" type="button">Use pasted names</button>
         </details>
 
-        <label class="check"><input type="checkbox" id="dedupeCheck" checked> Remove duplicate names</label>
         <p id="sampleNote" class="sample-note" hidden>Showing sample names so you can try a draw. Upload your list to replace them.</p>
         <p id="loadStatus" class="status" role="status"></p>
       </section>
@@ -242,14 +241,14 @@
           </label>
           <div class="quota-row">
             <label class="field" for="quotaIn">Winners from <span class="gname">ECSO</span></label>
-            <input type="number" id="quotaIn" min="0" max="999" value="2">
+            <input type="number" id="quotaIn" min="0" max="999" value="9">
           </div>
           <div class="quota-row">
             <label class="field" for="quotaOut">Winners from non-<span class="gname">ECSO</span></label>
-            <input type="number" id="quotaOut" min="0" max="999" value="1">
+            <input type="number" id="quotaOut" min="0" max="999" value="3">
           </div>
           <p class="progress" id="ruleProgress"></p>
-          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled. If a winner isn't here, click Not available next to their name: the next draw replaces them from the same group. Groups are never shown on the draw screen; use Audience view to hide these settings while presenting.</p>
+          <p class="muted small" id="quotaHelp">Each round picks one name at random from everyone whose group still has a winner slot open. The draw stops when every slot is filled. Nobody can be drawn twice, even if you reload the list; only Start over clears the winners. If a winner isn't here, click Not available next to their name: the next draw replaces them from the same group. Groups are never shown on the draw screen; use Audience view to hide these settings while presenting.</p>
         </div>
         <p class="muted small" id="unlimitedHelp" hidden>Each round picks one name at random from everyone left. Keep drawing as long as you like. If a winner isn't here, click Not available next to their name and draw a replacement.</p>
         <p id="ruleWarn" class="status err" hidden></p>
@@ -291,7 +290,7 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "luckyDraw.v2";
+  var STORAGE_KEY = "luckyDraw.v3";
   var SAMPLE_ROWS = [["Name", "Department"],
     ["Aisha Rahman", "ECSO"], ["Ben Lee", "Finance"], ["Chandra Kumar", "ECSO"], ["Daniel Wong", "HR"],
     ["Elena Petrova", "ECSO"], ["Farid Hassan", "IT"], ["Grace Lim", "ECSO"], ["Hiro Tanaka", "Finance"],
@@ -303,7 +302,7 @@
     return {
       participants: [], pool: [], winners: [], pending: [], sample: false,
       rows: null, nameCol: 0, groupCol: -1, header: true,
-      rule: { mode: "quota", group: "ECSO", quotaIn: 2, quotaOut: 1 }
+      rule: { mode: "quota", group: "ECSO", quotaIn: 9, quotaOut: 3 }
     };
   }
   // participants/pool: [{ name, group }]
@@ -362,7 +361,7 @@
   }
 
   // ---------- Groups and the draw rule ----------
-  function norm(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
+  function norm(s) { return String(s == null ? "" : s).trim().replace(/\s+/g, " ").toLowerCase(); }
   function hasGroups() { return state.groupCol >= 0; }
   function quotaActive() { return state.rule.mode === "quota" && hasGroups(); }
   function inGroup(p) { return norm(p.group) === norm(state.rule.group); }
@@ -375,14 +374,16 @@
 
   // Names that can win this round. A pending replacement comes from the same side of the rule.
   function eligible() {
+    var drawn = drawnSet();
+    var pool = state.pool.filter(function (p) { return !drawn[norm(p.name)]; });
     if (state.pending.length) {
       var side = state.pending[0].side;
-      if (side === "any" || !hasGroups()) return state.pool;
-      return state.pool.filter(function (p) { return (side === "in") === inGroup(p); });
+      if (side === "any" || !hasGroups()) return pool;
+      return pool.filter(function (p) { return (side === "in") === inGroup(p); });
     }
-    if (!quotaActive()) return state.pool;
+    if (!quotaActive()) return pool;
     var wonIn = winnersIn(), wonOut = present().length - wonIn;
-    return state.pool.filter(function (p) {
+    return pool.filter(function (p) {
       return inGroup(p) ? wonIn < state.rule.quotaIn : wonOut < state.rule.quotaOut;
     });
   }
@@ -397,17 +398,32 @@
   }
 
   // ---------- Loading names ----------
-  function buildParticipants() {
-    var rows = state.header ? state.rows.slice(1) : state.rows;
-    var seen = {}, dedupe = $("dedupeCheck").checked, out = [];
+  // Each person appears once; names match regardless of capitals or extra spaces.
+  function buildParticipants(st) {
+    st = st || state;
+    var rows = st.header ? st.rows.slice(1) : st.rows;
+    var seen = {}, out = [];
     rows.forEach(function (r) {
-      var name = String(r[state.nameCol] == null ? "" : r[state.nameCol]).trim();
-      if (!name) return;
-      if (dedupe) { if (seen[norm(name)]) return; seen[norm(name)] = true; }
-      out.push({ name: name, group: state.groupCol >= 0 ? String(r[state.groupCol] == null ? "" : r[state.groupCol]).trim() : "" });
+      var name = String(r[st.nameCol] == null ? "" : r[st.nameCol]).trim().replace(/\s+/g, " ");
+      if (!name || seen[norm(name)]) return;
+      seen[norm(name)] = true;
+      out.push({ name: name, group: st.groupCol >= 0 ? String(r[st.groupCol] == null ? "" : r[st.groupCol]).trim() : "" });
     });
     return out;
   }
+
+  // Everyone already drawn (including people marked not available) stays out until Start over.
+  function drawnSet() {
+    var set = {};
+    state.winners.forEach(function (w) { set[norm(w.name)] = true; });
+    return set;
+  }
+  function fillPool() {
+    var drawn = drawnSet();
+    state.pool = state.participants.filter(function (p) { return !drawn[norm(p.name)]; });
+    return state.participants.length - state.pool.length;
+  }
+
 
   function guessColumns(rows) {
     var header = rows[0] || [];
@@ -462,54 +478,44 @@
     else if (values.length) state.rule.group = values[0];
   }
 
-  // Replace the participant list, asking first if a draw is under way.
+  // Load a new participant list. Winners so far are kept and can't be drawn again; only Start over clears them.
   function commitRows(rows, source, opts) {
     opts = opts || {};
-    var apply = function () {
-      var prevRule = state.rule;
-      state = Object.assign(freshState(), { rows: rows, sample: !!opts.sample, rule: prevRule });
-      var g = guessColumns(rows);
-      state.nameCol = g.nameCol; state.groupCol = g.groupCol; state.header = g.header;
-      state.participants = buildParticipants();
-      if (!state.participants.length) {
-        setStatus("No names found in " + source + ". Check that the names are in the first sheet.", "err");
-        state.participants = []; save(); renderAll(); return;
-      }
-      state.pool = state.participants.slice();
-      pickDefaultGroupValue();
-      save();
-      if (!opts.sample) {
-        var groups = hasGroups() ? " Groups read from column " + colLetter(state.groupCol) + "." : " No group column found.";
-        setStatus("Loaded " + state.participants.length + " names from " + source + "." + groups, "ok");
-      }
-      setReel("Ready");
-      $("undoBtn").hidden = true;
-      renderAll();
-    };
-    if (state.winners.length && !state.sample) {
-      askConfirm("Loading a new list clears the " + state.winners.length + " winners drawn so far. Continue?", apply);
-    } else apply();
+    var next = Object.assign(freshState(), { rows: rows, sample: !!opts.sample, rule: state.rule });
+    var g = guessColumns(rows);
+    next.nameCol = g.nameCol; next.groupCol = g.groupCol; next.header = g.header;
+    next.participants = buildParticipants(next);
+    if (!next.participants.length) {
+      setStatus("No names found in " + source + ". Check that the names are in the first sheet.", "err");
+      return;
+    }
+    if (state.winners.length && !state.sample && !opts.sample) {
+      next.winners = state.winners;
+      next.pending = state.pending;
+    }
+    state = next;
+    fillPool();
+    pickDefaultGroupValue();
+    save();
+    if (!opts.sample) {
+      var groups = hasGroups() ? " Groups read from column " + colLetter(state.groupCol) + "." : " No group column found.";
+      var kept = state.winners.length ? " The " + state.winners.length + " people already drawn stay out of the draw. Use Start over to clear them." : "";
+      setStatus("Loaded " + state.participants.length + " names from " + source + "." + groups + kept, "ok");
+    }
+    if (!state.winners.length) setReel("Ready");
+    $("undoBtn").hidden = true;
+    renderAll();
   }
 
-  // Re-read the current rows after a column or header change.
+  // Re-read the current rows after a column or header change. Winners so far are kept.
   function rebuildFromRows() {
-    var apply = function () {
-      state.participants = buildParticipants();
-      state.pool = state.participants.slice();
-      state.winners = [];
-      state.pending = [];
-      pickDefaultGroupValue();
-      save();
-      setReel("Ready");
-      $("undoBtn").hidden = true;
-      setStatus(state.participants.length + " names ready.", "ok");
-      renderAll();
-    };
-    if (state.winners.length && !state.sample) {
-      askConfirm("Changing columns clears the " + state.winners.length + " winners drawn so far. Continue?", apply, function () {
-        fillColumnSelects();
-      });
-    } else apply();
+    state.participants = buildParticipants();
+    var excluded = fillPool();
+    pickDefaultGroupValue();
+    save();
+    setStatus(state.participants.length + " names on the list" + (excluded ? ", " + excluded + " already drawn" : "") + ".", "ok");
+    $("undoBtn").hidden = true;
+    renderAll();
   }
 
   function readFile(file) {
@@ -817,7 +823,6 @@
   $("columnSelect").addEventListener("change", function (e) { state.nameCol = Number(e.target.value); rebuildFromRows(); });
   $("groupColSelect").addEventListener("change", function (e) { state.groupCol = Number(e.target.value); rebuildFromRows(); });
   $("headerCheck").addEventListener("change", function (e) { state.header = e.target.checked; rebuildFromRows(); });
-  $("dedupeCheck").addEventListener("change", function () { if (state.rows) rebuildFromRows(); });
   $("pasteBtn").addEventListener("click", function () {
     var rows = parsePasted($("pasteInput").value);
     if (!rows.length) { setStatus("Paste at least one name first.", "err"); return; }
@@ -840,15 +845,15 @@
   $("undoBtn").addEventListener("click", undo);
   $("copyBtn").addEventListener("click", copyWinners);
   $("resetBtn").addEventListener("click", function () {
-    askConfirm("Clear all participants and winners?", function () {
-      var rule = state.rule;
-      state = freshState();
-      state.rule = rule;
+    askConfirm("Start over? All winners are cleared and everyone on the list can be drawn again.", function () {
+      state.winners = [];
+      state.pending = [];
+      state.pool = state.participants.slice();
       $("copyFallback").hidden = true;
       $("copyStatus").hidden = true;
-      setStatus("");
+      setStatus(state.participants.length ? "Started over. All " + state.participants.length + " names are back in the draw." : "", "ok");
       save();
-      setReel("Add names to begin");
+      setReel(state.participants.length ? "Ready" : "Add names to begin");
       $("undoBtn").hidden = true;
       renderAll();
     });
