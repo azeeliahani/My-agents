@@ -1,0 +1,32 @@
+1
+00:00:00,200 --> 00:00:03,500
+Imagine every agent giving you answers you can trust!
+
+2
+00:00:03,800 --> 00:00:11,500
+Just ask! Copilot, Pricing Agent, Data Agent... you get the same trusted answer, and you always see where it came from.
+
+3
+00:00:11,800 --> 00:00:16,700
+Here's the magic behind it. First, the agents: today's, and every new one coming.
+
+4
+00:00:17,000 --> 00:00:23,300
+They all ask one shared retrieval layer: reusable, safe, traceable and relevant, with rules that check every answer.
+
+5
+00:00:23,600 --> 00:00:28,900
+Underneath, one set of governance rules keeps every knowledge source accurate and up to date.
+
+6
+00:00:29,200 --> 00:00:34,900
+Ask a question, and it flows down, finds the right source, and comes right back, with proof!
+
+7
+00:00:35,200 --> 00:00:41,300
+Building a new agent? Easy! Register it, plug in, and inherit every rule. You're live from day one!
+
+8
+00:00:41,600 --> 00:00:44,500
+Every agent. One trusted knowledge foundation!
+
