@@ -161,7 +161,7 @@ function headline(t) {
 }
 
 const CAPTIONS = [
-  { a: 4.8, b: 15.4, t: 'Copilot, Pricing Agent, Data Agent — the user simply asks, in plain language.' },
+  { a: 4.8, b: 15.4, t: 'EKA, Pricing Agent, Data Agent — the user simply asks, in plain language.' },
   { a: 15.4, b: 18.8, t: 'Different agents. Consistent answers. Every answer shows where it came from.' },
   { a: 19.6, b: 26.6, t: 'Layer 1 · Consume — today’s and tomorrow’s agents all ask the same place.' },
   { a: 26.6, b: 30.6, t: 'Layer 2 · Shared retrieval — one search service that every agent reuses.' },
@@ -250,7 +250,7 @@ function sceneTitle(t) {
 
 /* ---------- Scene 2: user point of view ---------- */
 const CHATS = [
-  { name: 'Copilot', q: 'What’s the latest SME postpaid plan policy?', a: 'Policy v3.2 applies from 1 Nov: 24-month contract, device add-on optional.', src: 'Product' },
+  { name: 'EKA', q: 'What’s the latest SME postpaid plan policy?', a: 'Policy v3.2 applies from 1 Nov: 24-month contract, device add-on optional.', src: 'Product' },
   { name: 'Pricing Agent', q: 'Can I offer a 10% bundle discount to this SME customer?', a: 'Yes, up to 10% on SME bundles. Manager approval needed above RM5k.', src: 'Marketing' },
   { name: 'Data Agent', q: 'What was SME churn last quarter, using the official definition?', a: 'Using the Knowledge Hub glossary definition, Q3 SME churn was 1.8%.', src: 'Knowledge Hub' },
 ];
@@ -266,7 +266,7 @@ function sceneUser(t) {
     ctx.lineWidth = 4; ctx.strokeStyle = C.maxis; ctx.stroke();
     ctx.save(); ctx.beginPath(); ctx.arc(230, 540, 88, 0, Math.PI * 2); ctx.clip();
     icon('user', 230, 548, 120, C.white); ctx.restore();
-    T('You', 230, 672, 34, C.white, { w: 700, al: 'center' });
+    T('User', 230, 672, 34, C.white, { w: 700, al: 'center' });
     T('Field sales executive', 230, 708, 20, C.muted, { w: 500, al: 'center' });
   });
   CHATS.forEach((c, i) => {
