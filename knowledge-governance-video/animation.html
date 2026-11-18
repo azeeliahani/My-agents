@@ -1,0 +1,656 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Knowledge Foundation Motion</title>
+<style>html,body{margin:0;background:#06162B}canvas{display:block;width:100vw;height:auto}</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080"></canvas>
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = 1920, H = 1080, DURATION = 59;
+
+// Palette: white, dark green, dark blue, Maxis green
+const C = {
+  navy: '#06162B', navy2: '#0C2748', blue: '#123A66',
+  green: '#0B4D36', green2: '#0E6B47', maxis: '#7AC143',
+  white: '#FFFFFF', soft: '#DCE6F0', muted: '#8EA6BF',
+  ink: '#0B1F3A', inkMuted: '#4A6078', bubble: '#EEF3F8'
+};
+
+/* ---------- helpers ---------- */
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const eo = x => 1 - Math.pow(1 - x, 3);
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const P = (t, a, d) => clamp((t - a) / d);
+const win = (t, a, b, f = 0.45) => Math.min(P(t, a, f), 1 - P(t, b - f, f));
+const lerp = (a, b, p) => a + (b - a) * p;
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); }
+function font(size, w = 600, it = false) { ctx.font = `${it ? 'italic ' : ''}${w} ${size}px Inter`; }
+function T(s, x, y, size, color, o = {}) {
+  font(size, o.w ?? 600, o.it);
+  ctx.fillStyle = color; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.bl || 'middle';
+  ctx.letterSpacing = (o.ls || 0) + 'px';
+  ctx.fillText(s, x, y);
+  ctx.letterSpacing = '0px';
+}
+function tw(s, size, w = 600, ls = 0) { font(size, w); ctx.letterSpacing = ls + 'px'; const m = ctx.measureText(s).width; ctx.letterSpacing = '0px'; return m; }
+function wrap(s, maxW, size, w = 500) {
+  font(size, w);
+  const words = s.split(' '); const lines = []; let cur = '';
+  for (const wd of words) {
+    const test = cur ? cur + ' ' + wd : wd;
+    if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = wd; } else cur = test;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+function withPop(p, cx, cy, fn, dy = 24) {
+  if (p <= 0) return;
+  const e = eo(p), s = 0.9 + 0.1 * back(p);
+  ctx.save(); ctx.globalAlpha *= e;
+  ctx.translate(cx, cy + (1 - e) * dy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+  fn(); ctx.restore();
+}
+function glow(x, y, w, h, r, a, col = C.maxis, lw = 4) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha *= a;
+  ctx.shadowColor = col; ctx.shadowBlur = 28;
+  rr(x, y, w, h, r); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke();
+  ctx.restore();
+}
+function checkBadge(cx, cy, r, a = 1) {
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha *= a;
+  circle(cx, cy, r); ctx.fillStyle = C.maxis; ctx.fill();
+  ctx.strokeStyle = C.white; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx - r * .45, cy); ctx.lineTo(cx - r * .1, cy + r * .38); ctx.lineTo(cx + r * .5, cy - r * .35);
+  ctx.strokeStyle = C.ink; ctx.lineWidth = r * 0.24; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- icons ---------- */
+function arrowHead(x, y, ang, s) {
+  ctx.beginPath();
+  ctx.moveTo(x + Math.cos(ang) * s, y + Math.sin(ang) * s);
+  ctx.lineTo(x + Math.cos(ang + 2.5) * s, y + Math.sin(ang + 2.5) * s);
+  ctx.lineTo(x + Math.cos(ang - 2.5) * s, y + Math.sin(ang - 2.5) * s);
+  ctx.closePath(); ctx.fill();
+}
+function icon(kind, cx, cy, s, col) {
+  ctx.save();
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = Math.max(2, s * 0.09);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (kind === 'user') {
+    circle(cx, cy - s * .2, s * .2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, cy + s * .42, s * .36, s * .3, 0, Math.PI, 2 * Math.PI); ctx.fill();
+  } else if (kind === 'bot') {
+    rr(cx - s * .38, cy - s * .2, s * .76, s * .56, s * .14); ctx.stroke();
+    circle(cx - s * .14, cy + s * .06, s * .07); ctx.fill();
+    circle(cx + s * .14, cy + s * .06, s * .07); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx, cy - s * .2); ctx.lineTo(cx, cy - s * .36); ctx.stroke();
+    circle(cx, cy - s * .4, s * .06); ctx.fill();
+  } else if (kind === 'reuse') {
+    const r = s * .32;
+    for (const [a0, a1] of [[-Math.PI / 2 + .35, Math.PI / 2 - .35], [Math.PI / 2 + .35, Math.PI * 1.5 - .35]]) {
+      ctx.beginPath(); ctx.arc(cx, cy, r, a0, a1); ctx.stroke();
+      arrowHead(cx + r * Math.cos(a1), cy + r * Math.sin(a1), a1 + Math.PI / 2, s * .14);
+    }
+  } else if (kind === 'lock') {
+    rr(cx - s * .3, cy - s * .04, s * .6, s * .44, s * .08); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy - s * .04, s * .19, Math.PI, 0); ctx.stroke();
+  } else if (kind === 'trace') {
+    ctx.beginPath();
+    ctx.arc(cx, cy - s * .1, s * .24, Math.PI * 0.8, Math.PI * 2.2);
+    ctx.lineTo(cx, cy + s * .4); ctx.closePath(); ctx.stroke();
+    circle(cx, cy - s * .1, s * .08); ctx.fill();
+  } else if (kind === 'target') {
+    for (const k of [.38, .24]) { circle(cx, cy, s * k); ctx.stroke(); }
+    circle(cx, cy, s * .09); ctx.fill();
+  } else if (kind === 'db') {
+    const rx = s * .3, ry = s * .1, top = cy - s * .28, bot = cy + s * .28;
+    ctx.beginPath(); ctx.ellipse(cx, top, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - rx, top); ctx.lineTo(cx - rx, bot); ctx.ellipse(cx, bot, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, top); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ---------- background, headline, caption ---------- */
+function background(t) {
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#06162B'); g.addColorStop(1, '#0A2A4A');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  let rg = ctx.createRadialGradient(150, 1050, 0, 150, 1050, 950);
+  rg.addColorStop(0, 'rgba(14,107,71,0.42)'); rg.addColorStop(1, 'rgba(14,107,71,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  rg = ctx.createRadialGradient(1800, 60, 0, 1800, 60, 700);
+  rg.addColorStop(0, 'rgba(122,193,67,0.10)'); rg.addColorStop(1, 'rgba(122,193,67,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,0.055)';
+  const off = (t * 8) % 48;
+  for (let x = -48 + off; x < W; x += 48) for (let y = 24; y < H; y += 48) { ctx.fillRect(x, y, 2, 2); }
+}
+
+const HEADLINES = [
+  { a: 4.6, b: 18.6, k: 'THE END-USER EXPERIENCE', t: 'Ask any agent. Get the same trusted answer.' },
+  { a: 18.6, b: 42.0, k: 'THE FUTURE KNOWLEDGE ARCHITECTURE', t: 'Behind every answer: three layers working together' },
+  { a: 42.0, b: 48.5, k: 'HOW AN ANSWER IS FOUND', t: 'One question, end to end' },
+  { a: 48.5, b: 55.6, k: 'FOR AGENT CREATORS', t: 'Building a new agent? Plug in, don’t rebuild.' },
+];
+function headline(t) {
+  for (const h of HEADLINES) {
+    const a = win(t, h.a, h.b, 0.4);
+    if (a <= 0) continue;
+    const dx = (1 - eo(P(t, h.a, 0.6))) * -30;
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = C.maxis; ctx.fillRect(60 + dx, 44, 6, 72);
+    T(h.k, 86 + dx, 58, 19, C.maxis, { w: 700, ls: 3 });
+    T(h.t, 84 + dx, 98, 42, C.white, { w: 700 });
+    ctx.restore();
+  }
+}
+
+const CAPTIONS = [
+  { a: 4.8, b: 15.4, t: 'Copilot, Pricing Agent, Data Agent — the user simply asks, in plain language.' },
+  { a: 15.4, b: 18.8, t: 'Different agents. Consistent answers. Every answer shows where it came from.' },
+  { a: 19.6, b: 26.6, t: 'Layer 1 · Consume — today’s and tomorrow’s agents all ask the same place.' },
+  { a: 26.6, b: 30.6, t: 'Layer 2 · Shared retrieval — one search service that every agent reuses.' },
+  { a: 30.6, b: 34.6, t: 'RULES' },
+  { a: 34.6, b: 39.0, t: 'Layer 3 · Governance — one standard set of rules for every knowledge source.' },
+  { a: 39.0, b: 42.0, t: 'Federated sources, one standard: every source is governed before agents use it.' },
+  { a: 42.0, b: 48.5, t: 'Agent asks  →  retrieval rules applied  →  governed source found  →  answer returns with its source' },
+  { a: 48.5, b: 55.6, t: 'STEPS' },
+];
+function captionBar(t) {
+  const a = win(t, 4.7, 55.8, 0.5);
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = a;
+  rr(40, 972, 1840, 74, 18); ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = C.maxis; rr(40, 972, 8, 74, 4); ctx.fill();
+  ctx.restore();
+  for (const c of CAPTIONS) {
+    const ca = win(t, c.a, c.b, 0.35) * a;
+    if (ca <= 0) continue;
+    ctx.save(); ctx.globalAlpha = ca;
+    if (c.t === 'RULES') rulesCaption(t);
+    else if (c.t === 'STEPS') stepsCaption(t);
+    else T(c.t, 76, 1009, 26, C.white, { w: 500 });
+    ctx.restore();
+  }
+}
+function rulesCaption(t) {
+  T('Every retrieval is checked:', 76, 1009, 26, C.white, { w: 600 });
+  const items = ['Right user', 'Right content', 'Source cited', 'Best match first'];
+  let x = 470;
+  items.forEach((s, i) => {
+    const p = P(t, 31.0 + i * 0.5, 0.35);
+    checkBadge(x + 16, 1009, 15, eo(p) * 0.95 + 0.05);
+    T(s, x + 42, 1009, 24, p > 0 ? C.white : C.muted, { w: 600 });
+    x += 54 + tw(s, 24, 600) + 40;
+  });
+}
+const STEP_TIMES = [50.4, 51.6, 52.9, 54.1];
+const STEP_LABELS = ['1  Register your agent', '2  Connect to shared retrieval', '3  Inherit access & governance rules', 'Live with trusted answers'];
+function stepsCaption(t) {
+  let x = 64;
+  const ws = [340, 400, 480, 380];
+  STEP_LABELS.forEach((s, i) => {
+    const w = ws[i];
+    const done = P(t, STEP_TIMES[i], 0.35);
+    rr(x, 986, w, 46, 23);
+    ctx.fillStyle = done > 0 ? hexA('#7AC143', 0.18 + 0.82 * done) : 'rgba(255,255,255,0.04)'; ctx.fill();
+    ctx.strokeStyle = done > 0 ? C.maxis : 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2; ctx.stroke();
+    const col = done > 0.5 ? C.ink : C.soft;
+    if (i === 3) {
+      checkBadge(x + 28, 1009, 13, 0.4 + 0.6 * done);
+      T(s, x + 52, 1009, 22, col, { w: 700 });
+    } else T(s, x + 22, 1009, 22, col, { w: 700 });
+    if (i < 3) T('›', x + w + 12, 1007, 34, C.muted, { w: 400 });
+    x += w + 34;
+  });
+}
+
+/* ---------- Scene 1: title ---------- */
+function sceneTitle(t) {
+  const a = 1 - P(t, 4.0, 0.6);
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = a;
+  const cols = [C.white, C.maxis, C.green2];
+  for (let i = 0; i < 3; i++) {
+    const p = eo(P(t, 0.2 + i * 0.22, 0.7));
+    const w = 360 - i * 0, x = W / 2 - w / 2 + (1 - p) * (i % 2 ? 260 : -260), y = 250 + i * 40;
+    ctx.save(); ctx.globalAlpha = a * p;
+    rr(x, y, w, 26, 13); ctx.fillStyle = cols[i]; ctx.fill();
+    ctx.restore();
+  }
+  const k = eo(P(t, 0.8, 0.6));
+  ctx.globalAlpha = a * k;
+  T('THE FUTURE OF ENTERPRISE KNOWLEDGE', W / 2, 450 + (1 - k) * 20, 24, C.maxis, { w: 700, al: 'center', ls: 5 });
+  const l1 = eo(P(t, 1.1, 0.7)), l2 = eo(P(t, 1.4, 0.7));
+  ctx.globalAlpha = a * l1;
+  T('Every agent.', W / 2, 545 + (1 - l1) * 30, 76, C.white, { w: 800, al: 'center' });
+  ctx.globalAlpha = a * l2;
+  T('One trusted knowledge foundation.', W / 2, 640 + (1 - l2) * 30, 76, C.white, { w: 800, al: 'center' });
+  const s = eo(P(t, 2.0, 0.7));
+  ctx.globalAlpha = a * s;
+  T('How users, agents and governed knowledge will connect', W / 2, 745, 30, C.soft, { w: 400, al: 'center' });
+  ctx.restore();
+}
+
+/* ---------- Scene 2: user point of view ---------- */
+const CHATS = [
+  { name: 'Copilot', q: 'What’s the latest SME postpaid plan policy?', a: 'Policy v3.2 applies from 1 Nov: 24-month contract, device add-on optional.', src: 'Product' },
+  { name: 'Pricing Agent', q: 'Can I offer a 10% bundle discount to this SME customer?', a: 'Yes, up to 10% on SME bundles. Manager approval needed above RM5k.', src: 'Marketing' },
+  { name: 'Data Agent', q: 'What was SME churn last quarter, using the official definition?', a: 'Using the Knowledge Hub glossary definition, Q3 SME churn was 1.8%.', src: 'Knowledge Hub' },
+];
+const CARD = { x0: 470, step: 480, y: 250, w: 440, h: 500 };
+function sceneUser(t) {
+  const a = win(t, 4.4, 19.0, 0.6);
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = a;
+  // avatar
+  const ap = P(t, 4.6, 0.6);
+  withPop(ap, 230, 540, () => {
+    circle(230, 540, 92); ctx.fillStyle = C.navy2; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = C.maxis; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(230, 540, 88, 0, Math.PI * 2); ctx.clip();
+    icon('user', 230, 548, 120, C.white); ctx.restore();
+    T('You', 230, 672, 34, C.white, { w: 700, al: 'center' });
+    T('Field sales executive', 230, 708, 20, C.muted, { w: 500, al: 'center' });
+  });
+  CHATS.forEach((c, i) => {
+    const s = 5.0 + i * 3.6;
+    const x = CARD.x0 + i * CARD.step, y = CARD.y;
+    // connection line from avatar
+    const lp = eo(P(t, s - 0.1, 0.6));
+    if (lp > 0) {
+      const tx = x + CARD.w / 2, ty = y;
+      ctx.save();
+      ctx.beginPath();
+      const steps = 40;
+      for (let k = 0; k <= steps * lp; k++) {
+        const u = k / steps;
+        const bx = Math.pow(1 - u, 3) * 230 + 3 * Math.pow(1 - u, 2) * u * 230 + 3 * (1 - u) * u * u * tx + u * u * u * tx;
+        const by = Math.pow(1 - u, 3) * 448 + 3 * Math.pow(1 - u, 2) * u * 180 + 3 * (1 - u) * u * u * 180 + u * u * u * ty;
+        k === 0 ? ctx.moveTo(bx, by) : ctx.lineTo(bx, by);
+      }
+      const active = t >= s - 0.1 && t < s + 3.6;
+      ctx.strokeStyle = active ? C.maxis : 'rgba(122,193,67,0.35)'; ctx.lineWidth = active ? 3.5 : 2;
+      ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 40; ctx.stroke();
+      ctx.restore();
+    }
+    const cp = P(t, s, 0.55);
+    withPop(cp, x + CARD.w / 2, y + CARD.h / 2, () => chatCard(t, c, x, y, s));
+    // active highlight
+    const act = win(t, s, s + 3.6, 0.3);
+    if (i === 2) glow(x, y, CARD.w, CARD.h, 24, P(t, s, 0.3) * (1 - P(t, 18.2, 0.5)));
+    else glow(x, y, CARD.w, CARD.h, 24, act);
+  });
+  ctx.restore();
+}
+function chatCard(t, c, x, y, s) {
+  // shell
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+  rr(x, y, CARD.w, CARD.h, 24); ctx.fillStyle = C.white; ctx.fill();
+  ctx.restore();
+  ctx.save(); rr(x, y, CARD.w, CARD.h, 24); ctx.clip();
+  ctx.fillStyle = C.ink; ctx.fillRect(x, y, CARD.w, 84);
+  ctx.fillStyle = C.maxis; ctx.fillRect(x, y + 84, CARD.w, 4);
+  ctx.restore();
+  icon('bot', x + 46, y + 44, 46, C.maxis);
+  T(c.name, x + 84, y + 42, 26, C.white, { w: 700 });
+  circle(x + CARD.w - 34, y + 42, 7); ctx.fillStyle = C.maxis; ctx.fill();
+  T('online', x + CARD.w - 48, y + 42, 16, C.muted, { w: 500, al: 'right' });
+  // question bubble (typed)
+  const qLines = wrap(c.q, 300, 22, 600);
+  const total = c.q.length;
+  const shown = Math.floor(total * P(t, s + 0.4, 1.0));
+  let qw = 0; font(22, 600); qLines.forEach(l => qw = Math.max(qw, ctx.measureText(l).width));
+  const qh = qLines.length * 30 + 28, qx = x + CARD.w - 24 - (qw + 36), qy = y + 120;
+  if (shown > 0) {
+    rr(qx, qy, qw + 36, qh, [18, 18, 4, 18]); ctx.fillStyle = C.maxis; ctx.fill();
+    let used = 0;
+    qLines.forEach((l, li) => {
+      const n = clamp(shown - used, 0, l.length); used += l.length + 1;
+      T(l.slice(0, n), qx + 18, qy + 28 + li * 30, 22, C.ink, { w: 600 });
+    });
+  }
+  // typing dots
+  const ay = qy + qh + 26;
+  const dA = win(t, s + 1.45, s + 2.1, 0.12);
+  if (dA > 0) {
+    ctx.save(); ctx.globalAlpha *= dA;
+    rr(x + 24, ay, 92, 46, [18, 18, 18, 4]); ctx.fillStyle = C.bubble; ctx.fill();
+    for (let k = 0; k < 3; k++) {
+      const b = Math.sin((t - s) * 10 - k * 0.9) * 4;
+      circle(x + 48 + k * 22, ay + 23 - Math.max(0, b), 5.5); ctx.fillStyle = C.inkMuted; ctx.fill();
+    }
+    ctx.restore();
+  }
+  // answer
+  const ap = eo(P(t, s + 2.05, 0.45));
+  if (ap > 0) {
+    const aLines = wrap(c.a, 330, 22, 500);
+    const ah = aLines.length * 31 + 28;
+    ctx.save(); ctx.globalAlpha *= ap; ctx.translate(0, (1 - ap) * 14);
+    rr(x + 24, ay, 370, ah, [18, 18, 18, 4]); ctx.fillStyle = C.bubble; ctx.fill();
+    aLines.forEach((l, li) => T(l, x + 44, ay + 29 + li * 31, 22, C.ink, { w: 500 }));
+    ctx.restore();
+    // source chip
+    const sp = eo(P(t, s + 2.6, 0.4));
+    if (sp > 0) {
+      const cy = ay + ah + 20;
+      const label = `Source: ${c.src}`;
+      const lw = tw(label, 17, 700), gw = tw('Governed', 17, 700);
+      const cw = 52 + lw + 18 + 22 + 8 + gw + 18;
+      ctx.save(); ctx.globalAlpha *= sp; ctx.translate((1 - sp) * -16, 0);
+      rr(x + 24, cy, cw, 40, 20); ctx.fillStyle = C.green; ctx.fill();
+      icon('db', x + 48, cy + 20, 26, C.maxis);
+      T(label, x + 70, cy + 20, 17, C.white, { w: 700 });
+      checkBadge(x + 70 + lw + 29, cy + 20, 11);
+      T('Governed', x + 70 + lw + 48, cy + 20, 17, C.maxis, { w: 700 });
+      ctx.restore();
+    }
+  }
+}
+
+/* ---------- Architecture ---------- */
+const L1 = { y: 150, h: 205 }, L2 = { y: 392, h: 190 }, L3 = { y: 622, h: 330 };
+const FUT = ['Agent Force', 'Data Agent', 'Pricing Agent', 'Other Agent'];
+const RET = [
+  { t: 'Reusable', s: 'Any agent plugs in, one search', i: 'reuse' },
+  { t: 'Safe & scoped', s: 'Right people, right content', i: 'lock' },
+  { t: 'Traceable', s: 'Shows where each answer came from', i: 'trace' },
+  { t: 'Relevant', s: 'Best match first', i: 'target' },
+];
+const RULES = ['Metadata', 'Naming convention', 'Content validation & accuracy', 'Automated workflow', 'Access management', 'Content lifecycle'];
+const SRC = ['Knowledge Hub', 'DEN', 'ECSO', 'Product', 'Marketing'];
+const retX = i => 440 + i * 360;           // w 340
+const srcX = i => 460 + i * 279.6;         // w 261.6
+const futX = i => 890 + i * 196;           // w 180
+
+function bandShell(t, ta, y, h, num, accent, numInk, titleLines, sub, tag, emph = 0) {
+  const p = P(t, ta, 0.6);
+  withPop(p, W / 2, y + h / 2, () => {
+    rr(40, y, 1840, h, 20); ctx.fillStyle = 'rgba(255,255,255,0.045)'; ctx.fill();
+    ctx.strokeStyle = hexA(accent, 0.5 + 0.5 * emph); ctx.lineWidth = 2 + 2 * emph; ctx.stroke();
+    ctx.fillStyle = accent; rr(40, y + 18, 6, h - 36, 3); ctx.fill();
+    circle(100, y + 48, 30); ctx.fillStyle = accent; ctx.fill();
+    T(String(num), 100, y + 49, 30, numInk, { w: 800, al: 'center' });
+    const step = titleLines.length > 1 ? 34 : 38;
+    titleLines.forEach((l, i) => T(l, 146, y + 48 + i * step, titleLines.length > 1 ? 28 : 34, C.white, { w: 700 }));
+    const sy = y + 48 + titleLines.length * step + 14;
+    T(sub, 70, sy, 22, C.soft, { w: 600 });
+    T(tag, 70, sy + 30, 20, C.muted, { w: 500, it: true });
+  }, 16);
+  if (emph > 0) glow(40, y, 1840, h, 20, emph);
+}
+function connector(t, ta, y1, y2, label) {
+  const p = eo(P(t, ta, 0.5));
+  if (p <= 0) return;
+  ctx.save(); ctx.globalAlpha *= p;
+  const x = 1150;
+  ctx.strokeStyle = C.soft; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x, y1 + 4); ctx.lineTo(x, lerp(y1 + 4, y2 - 8, p)); ctx.stroke();
+  ctx.fillStyle = C.soft; arrowHead(x, y2 - 6, Math.PI / 2, 10);
+  T(label, x + 18, (y1 + y2) / 2, 20, C.soft, { w: 600 });
+  ctx.restore();
+}
+function whiteBox(x, y, w, h, title, sub, o = {}) {
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
+  rr(x, y, w, h, 14); ctx.fillStyle = o.fill || C.white; ctx.fill(); ctx.restore();
+  if (o.border) { rr(x, y, w, h, 14); ctx.strokeStyle = o.border; ctx.lineWidth = 3; ctx.stroke(); }
+  if (sub) {
+    T(title, x + w / 2, y + h / 2 - 16, o.size || 32, C.ink, { w: 700, al: 'center' });
+    T(sub, x + w / 2, y + h / 2 + 22, 22, C.inkMuted, { w: 500, al: 'center' });
+  } else T(title, x + w / 2, y + h / 2, o.size || 23, C.ink, { w: 700, al: 'center' });
+}
+
+function sceneArch(t) {
+  const a = P(t, 18.6, 0.5);
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = a;
+
+  // emphasis values for the agent-creator scene
+  const l2emph = win(t, 52.3, 53.6, 0.25);
+  const l3emph = win(t, 52.9, 54.4, 0.25);
+
+  /* Layer 1 */
+  bandShell(t, 19.4, L1.y, L1.h, 1, C.white, C.ink, ['Consume'], 'Who uses it', 'Agents');
+  withPop(P(t, 20.1, 0.5), 640, 252, () => whiteBox(440, 182, 400, 140, 'EKA', 'Copilot · Dexter'));
+  withPop(P(t, 20.6, 0.5), 1365, 252, () => {
+    rr(870, 172, 990, 160, 18); ctx.fillStyle = 'rgba(122,193,67,0.13)'; ctx.fill();
+    ctx.strokeStyle = C.maxis; ctx.lineWidth = 2.5; ctx.stroke();
+    T('Future agents', 1365, 198, 22, C.white, { w: 700, al: 'center' });
+  });
+  FUT.forEach((n, i) => {
+    const flash = i === 2 ? Math.max(clamp(1 - Math.abs(t - 42.4) / 0.4), win(t, 46.5, 48.3, 0.25)) : 0;
+    withPop(P(t, 21.0 + i * 0.2, 0.45), futX(i) + 90, 265, () => {
+      whiteBox(futX(i), 225, 180, 80, n, null);
+      glow(futX(i), 225, 180, 80, 14, flash);
+    });
+  });
+  // new agent slot + card (creator scene)
+  const slotA = P(t, 48.8, 0.4);
+  if (slotA > 0) {
+    ctx.save(); ctx.globalAlpha *= slotA;
+    rr(futX(4), 225, 180, 80, 14); ctx.setLineDash([8, 7]); ctx.strokeStyle = C.maxis; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.setLineDash([]);
+    T('+', futX(4) + 90, 263, 40, C.maxis, { w: 400, al: 'center' });
+    ctx.restore();
+  }
+  const fly = eio(P(t, 49.2, 1.0));
+  if (t >= 49.2) {
+    const nx = lerp(2060, futX(4), fly), ny = lerp(40, 225, fly);
+    ctx.save(); ctx.globalAlpha *= clamp(fly * 3);
+    whiteBox(nx, ny, 180, 80, 'Your Agent', null, { border: C.maxis });
+    rr(nx + 118, ny - 12, 54, 24, 12); ctx.fillStyle = C.maxis; ctx.fill();
+    T('NEW', nx + 145, ny, 14, C.ink, { w: 800, al: 'center', ls: 1 });
+    ctx.restore();
+    glow(futX(4), 225, 180, 80, 14, P(t, 50.2, 0.3) * (0.55 + 0.45 * P(t, 54.1, 0.4)) * (1 - P(t, 55.6, 0.4)));
+  }
+  // Live chip
+  const liveP = P(t, 54.1, 0.45) * (1 - P(t, 55.6, 0.4));
+  withPop(liveP, 1700, 135, () => {
+    rr(1560, 116, 290, 40, 20); ctx.fillStyle = C.maxis; ctx.fill();
+    T('Trusted answers from day one', 1705, 136, 18, C.ink, { w: 700, al: 'center' });
+  }, 10);
+
+  connector(t, 26.4, L1.y + L1.h, L2.y, 'asks');
+
+  /* Layer 2 */
+  bandShell(t, 26.5, L2.y, L2.h, 2, C.maxis, C.ink, ['Retrieve'], 'How answers are found', 'Shared retrieval layer', l2emph);
+  RET.forEach((r, i) => {
+    const x = retX(i), y = 412, w = 340, h = 150;
+    const tv = 43.0 + i * 0.5;
+    const flash = clamp(1 - Math.abs(t - tv) / 0.45);
+    const ticked = P(t, tv, 0.25) * (1 - P(t, 48.3, 0.4));
+    withPop(P(t, 27.2 + i * 0.5, 0.5), x + w / 2, y + h / 2, () => {
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
+      rr(x, y, w, h, 16); ctx.fillStyle = C.white; ctx.fill(); ctx.restore();
+      rr(x, y, w, h, 16); ctx.strokeStyle = hexA('#7AC143', 0.9); ctx.lineWidth = 2.5; ctx.stroke();
+      circle(x + 52, y + 75, 34); ctx.fillStyle = 'rgba(122,193,67,0.18)'; ctx.fill();
+      icon(r.i, x + 52, y + 75, 44, C.green);
+      T(r.t, x + 102, y + 48, 27, C.ink, { w: 700 });
+      wrap(r.s, 220, 19, 500).forEach((l, li) => T(l, x + 102, y + 86 + li * 25, 19, C.inkMuted, { w: 500 }));
+      glow(x, y, w, h, 16, flash);
+      checkBadge(x + w - 22, y + 22, 15, ticked);
+    });
+  });
+  // creator cable plug
+  const cab = eo(P(t, 51.6, 0.7));
+  if (cab > 0) {
+    const x = futX(4) + 90, y1 = 305, y2 = lerp(305, 412, cab);
+    ctx.save();
+    ctx.globalAlpha *= (1 - P(t, 55.6, 0.4));
+    ctx.shadowColor = C.maxis; ctx.shadowBlur = 18;
+    ctx.strokeStyle = C.maxis; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.stroke();
+    rr(x - 16, y2 - 22, 32, 22, 5); ctx.fillStyle = C.maxis; ctx.fill();
+    ctx.fillStyle = C.ink; ctx.fillRect(x - 9, y2 - 4, 4, 8); ctx.fillRect(x + 5, y2 - 4, 4, 8);
+    if (cab >= 1) { const pulse = clamp(1 - (t - 52.3) / 0.8); if (pulse > 0) { circle(x, 412, 20 + 60 * (1 - pulse)); ctx.strokeStyle = hexA('#7AC143', pulse); ctx.lineWidth = 4; ctx.stroke(); } }
+    ctx.restore();
+  }
+
+  connector(t, 34.4, L2.y + L2.h, L3.y, 'searches');
+
+  /* Layer 3 */
+  bandShell(t, 34.5, L3.y, L3.h, 3, C.green2, C.white, ['Governance', 'for Knowledge', 'Resources'], 'What keeps it right', 'Federated sources', l3emph);
+  withPop(P(t, 35.0, 0.5), 1150, 787, () => {
+    rr(440, 640, 1420, 294, 18); ctx.fillStyle = '#F5F9F4'; ctx.fill();
+    T('Standard governance rules for all knowledge sources', 1150, 676, 28, C.ink, { w: 700, al: 'center' });
+  });
+  // rule chips
+  font(18, 600);
+  const widths = RULES.map(r => ctx.measureText(r).width + 34);
+  const totalW = widths.reduce((s, w) => s + w, 0) + 12 * (RULES.length - 1);
+  let cx = 1150 - totalW / 2;
+  RULES.forEach((r, i) => {
+    const w = widths[i], x = cx;
+    withPop(P(t, 35.8 + i * 0.22, 0.4), x + w / 2, 731, () => {
+      rr(x, 712, w, 38, 19); ctx.fillStyle = C.green; ctx.fill();
+      T(r, x + w / 2, 731, 18, C.white, { w: 600, al: 'center' });
+    }, 12);
+    cx += w + 12;
+  });
+  // sources
+  const sweepX = lerp(440, 1880, eio(P(t, 39.0, 2.0)));
+  SRC.forEach((s, i) => {
+    const x = srcX(i), y = 782, w = 261.6, h = 128;
+    const flash = i === 4 ? clamp(1 - Math.abs(t - 45.3) / 0.45) : 0;
+    const gov = t > 39.0 && sweepX > x + w / 2 ? 1 : 0;
+    withPop(P(t, 37.4 + i * 0.2, 0.45), x + w / 2, y + h / 2, () => {
+      const g = ctx.createLinearGradient(x, y, x, y + h);
+      g.addColorStop(0, C.green2); g.addColorStop(1, C.green);
+      rr(x, y, w, h, 14); ctx.fillStyle = g; ctx.fill();
+      icon('db', x + w / 2, y + 46, 40, C.maxis);
+      T(s, x + w / 2, y + 96, 24, C.white, { w: 700, al: 'center' });
+      checkBadge(x + w - 22, y + 22, 15, gov ? 1 : 0);
+      glow(x, y, w, h, 14, Math.max(flash, l3emph * 0.8));
+    });
+  });
+  // sweep line
+  const sw = win(t, 39.0, 41.2, 0.2);
+  if (sw > 0) {
+    ctx.save(); ctx.globalAlpha *= sw;
+    const g = ctx.createLinearGradient(sweepX - 120, 0, sweepX, 0);
+    g.addColorStop(0, 'rgba(122,193,67,0)'); g.addColorStop(1, 'rgba(122,193,67,0.35)');
+    ctx.fillStyle = g; ctx.fillRect(sweepX - 120, 772, 120, 148);
+    ctx.fillStyle = C.maxis; ctx.shadowColor = C.maxis; ctx.shadowBlur = 20; ctx.fillRect(sweepX - 3, 766, 6, 160);
+    ctx.restore();
+  }
+
+  /* query flow (42-48.5) */
+  queryFlow(t);
+
+  ctx.restore();
+}
+
+const PATH = [
+  { x: 1372, y: 305, t: 42.4 },
+  { x: 610, y: 487, t: 43.0 },
+  { x: 970, y: 487, t: 43.5 },
+  { x: 1330, y: 487, t: 44.0 },
+  { x: 1690, y: 487, t: 44.5 },
+  { x: 1709, y: 846, t: 45.3 },
+  { x: 1372, y: 305, t: 46.5 },
+];
+function pathPos(tt) {
+  if (tt <= PATH[0].t) return PATH[0];
+  for (let i = 0; i < PATH.length - 1; i++) {
+    const A = PATH[i], B = PATH[i + 1];
+    if (tt <= B.t) { const p = eio((tt - A.t) / (B.t - A.t)); return { x: lerp(A.x, B.x, p), y: lerp(A.y, B.y, p) }; }
+  }
+  return PATH[PATH.length - 1];
+}
+function queryFlow(t) {
+  if (t < 42.2 || t > 48.6) return;
+  const vis = win(t, 42.2, 46.7, 0.2);
+  // trail
+  for (let k = 8; k >= 0; k--) {
+    const pp = pathPos(t - k * 0.035);
+    ctx.save(); ctx.globalAlpha *= vis * (1 - k / 9) * 0.6;
+    circle(pp.x, pp.y, 13 - k); ctx.fillStyle = C.maxis; ctx.fill(); ctx.restore();
+  }
+  if (vis > 0) {
+    const p = pathPos(t);
+    const returning = t > 45.3;
+    ctx.save(); ctx.globalAlpha *= vis;
+    ctx.shadowColor = C.maxis; ctx.shadowBlur = 26;
+    circle(p.x, p.y, 17); ctx.fillStyle = C.maxis; ctx.fill();
+    ctx.shadowBlur = 0; ctx.lineWidth = 4; ctx.strokeStyle = C.white; ctx.stroke();
+    if (!returning) T('?', p.x, p.y + 1, 20, C.ink, { w: 800, al: 'center' });
+    else {
+      icon('db', p.x, p.y, 20, C.ink);
+      rr(p.x + 26, p.y - 18, 178, 36, 18); ctx.fillStyle = C.white; ctx.fill();
+      T('Answer + source', p.x + 115, p.y, 18, C.ink, { w: 700, al: 'center' });
+    }
+    ctx.restore();
+  }
+  // answer tag over pricing agent
+  const tp = win(t, 46.5, 48.4, 0.3);
+  withPop(tp, 1372, 196, () => {
+    rr(1222, 178, 300, 38, 19); ctx.fillStyle = C.maxis; ctx.fill();
+    T('Answer · Source: Marketing', 1372, 197, 18, C.ink, { w: 700, al: 'center' });
+  }, 10);
+}
+
+/* ---------- End card ---------- */
+function sceneEnd(t) {
+  const o = eo(P(t, 55.5, 0.8));
+  if (o <= 0) return;
+  ctx.save();
+  ctx.fillStyle = `rgba(6,22,43,${0.96 * o})`; ctx.fillRect(0, 0, W, H);
+  const cols = [C.white, C.maxis, C.green2];
+  for (let i = 0; i < 3; i++) {
+    const p = eo(P(t, 55.9 + i * 0.15, 0.6));
+    ctx.globalAlpha = p;
+    rr(W / 2 - 150, 300 + i * 34, 300, 22, 11); ctx.fillStyle = cols[i]; ctx.fill();
+  }
+  const k = eo(P(t, 56.2, 0.6)); ctx.globalAlpha = k;
+  T('THE FUTURE STATE', W / 2, 470, 24, C.maxis, { w: 700, al: 'center', ls: 6 });
+  const l = eo(P(t, 56.5, 0.7)); ctx.globalAlpha = l;
+  T('Every agent. One governed knowledge foundation.', W / 2, 555 + (1 - l) * 24, 60, C.white, { w: 800, al: 'center' });
+  const s = eo(P(t, 57.1, 0.7)); ctx.globalAlpha = s;
+  T('Reusable  ·  Safe & scoped  ·  Traceable  ·  Relevant', W / 2, 640, 30, C.soft, { w: 500, al: 'center' });
+  const s2 = eo(P(t, 57.6, 0.7)); ctx.globalAlpha = s2;
+  rr(W / 2 - 330, 700, 660, 58, 29); ctx.fillStyle = C.green; ctx.fill();
+  ctx.strokeStyle = C.maxis; ctx.lineWidth = 2.5; ctx.stroke();
+  T('New agents plug in once and inherit every rule', W / 2, 729, 24, C.white, { w: 600, al: 'center' });
+  ctx.restore();
+}
+
+function render(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  background(t);
+  sceneTitle(t);
+  sceneUser(t);
+  sceneArch(t);
+  headline(t);
+  captionBar(t);
+  sceneEnd(t);
+}
+window.render = render;
+window.DURATION = DURATION;
+
+// live preview when opened directly in a browser
+if (!location.search.includes('capture')) {
+  const start = performance.now();
+  (function loop() { render(((performance.now() - start) / 1000) % DURATION); requestAnimationFrame(loop); })();
+}
+</script>
+</body>
+</html>
