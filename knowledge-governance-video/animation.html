@@ -142,7 +142,7 @@ function background(t) {
 }
 
 const HEADLINES = [
-  { a: 4.6, b: 18.6, k: 'THE END-USER EXPERIENCE', t: 'Ask any agent. Get the same trusted answer.' },
+  { a: 4.6, b: 18.6, k: 'THE END-USER EXPERIENCE', t: 'Just ask. The agents work it out together.' },
   { a: 18.6, b: 42.0, k: 'THE FUTURE KNOWLEDGE ARCHITECTURE', t: 'Behind every answer: three layers working together' },
   { a: 42.0, b: 48.5, k: 'HOW AN ANSWER IS FOUND', t: 'One question, end to end' },
   { a: 48.5, b: 55.6, k: 'FOR AGENT CREATORS', t: 'Building a new agent? Plug in, don’t rebuild.' },
@@ -161,8 +161,8 @@ function headline(t) {
 }
 
 const CAPTIONS = [
-  { a: 4.8, b: 15.4, t: 'EKA, Pricing Agent, Data Agent — the user simply asks, in plain language.' },
-  { a: 15.4, b: 18.8, t: 'Different agents. Consistent answers. Every answer shows where it came from.' },
+  { a: 4.8, b: 13.4, t: 'Plan, then price, then availability — one seamless conversation, no agent to choose.' },
+  { a: 13.4, b: 18.8, t: 'Behind the scenes, agents hand off and every answer shows its governed source.' },
   { a: 19.6, b: 26.6, t: 'Layer 1 · Consume — today’s and tomorrow’s agents all ask the same place.' },
   { a: 26.6, b: 30.6, t: 'Layer 2 · Shared retrieval — one search service that every agent reuses.' },
   { a: 30.6, b: 34.6, t: 'RULES' },
@@ -248,122 +248,179 @@ function sceneTitle(t) {
   ctx.restore();
 }
 
-/* ---------- Scene 2: user point of view ---------- */
-const CHATS = [
-  { name: 'EKA', q: 'What’s the latest SME postpaid plan policy?', a: 'Policy v3.2 applies from 1 Nov: 24-month contract, device add-on optional.', src: 'Product' },
-  { name: 'Pricing Agent', q: 'Can I offer a 10% bundle discount to this SME customer?', a: 'Yes, up to 10% on SME bundles. Manager approval needed above RM5k.', src: 'Marketing' },
-  { name: 'Data Agent', q: 'What was SME churn last quarter, using the official definition?', a: 'Using the Knowledge Hub glossary definition, Q3 SME churn was 1.8%.', src: 'Knowledge Hub' },
+/* ---------- Scene 2: user point of view (one conversation, agents hand off behind the scenes) ---------- */
+const CONVO = [
+  { q: 'Which postpaid plan suits a 20-person SME?', a: 'Business Postpaid 98: one shared data pool for the whole team, on a 24-month contract.', src: 'Product' },
+  { q: 'And what’s the price with a bundle discount?', a: 'RM98 per line, with up to 10% off SME bundles. Manager approval needed above RM5k.', src: 'Marketing' },
+  { q: 'Is it available at the customer’s office?', a: 'Yes. Fibre and 5G coverage are confirmed for that address.', src: 'Knowledge Hub' },
 ];
-const CARD = { x0: 470, step: 480, y: 250, w: 440, h: 500 };
+const EX_T = i => 5.0 + i * 4.3;
+const CHAT = { x: 90, y: 150, w: 920, h: 800 };
+const AGN = [{ x: 1200, y: 430, l: 'Plans' }, { x: 1460, y: 430, l: 'Pricing' }, { x: 1720, y: 430, l: 'Coverage' }];
+const SRN = [{ x: 1200, y: 770, l: 'Product' }, { x: 1460, y: 770, l: 'Marketing' }, { x: 1720, y: 770, l: 'Knowledge Hub' }];
+const CHAT_PT = { x: CHAT.x + CHAT.w, y: 520 };
+
+function pulse(t, t0, t1, A, B) {
+  if (t < t0 || t > t1 + 0.05) return;
+  for (let k = 6; k >= 0; k--) {
+    const p = eio(clamp((t - k * 0.03 - t0) / (t1 - t0)));
+    const x = lerp(A.x, B.x, p), y = lerp(A.y, B.y, p);
+    ctx.save(); ctx.globalAlpha *= (1 - k / 7);
+    if (k === 0) { ctx.shadowColor = C.maxis; ctx.shadowBlur = 22; }
+    circle(x, y, k === 0 ? 13 : 11 - k); ctx.fillStyle = C.maxis; ctx.fill();
+    if (k === 0) { ctx.shadowBlur = 0; ctx.lineWidth = 3; ctx.strokeStyle = C.white; ctx.stroke(); }
+    ctx.restore();
+  }
+}
+function dashLine(A, B, col, lw, off = 0) {
+  ctx.save(); ctx.setLineDash([8, 7]); ctx.lineDashOffset = off;
+  ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke(); ctx.restore();
+}
+
 function sceneUser(t) {
   const a = win(t, 4.4, 19.0, 0.6);
   if (a <= 0) return;
   ctx.save(); ctx.globalAlpha = a;
-  // avatar
-  const ap = P(t, 4.6, 0.6);
-  withPop(ap, 230, 540, () => {
-    circle(230, 540, 92); ctx.fillStyle = C.navy2; ctx.fill();
-    ctx.lineWidth = 4; ctx.strokeStyle = C.maxis; ctx.stroke();
-    ctx.save(); ctx.beginPath(); ctx.arc(230, 540, 88, 0, Math.PI * 2); ctx.clip();
-    icon('user', 230, 548, 120, C.white); ctx.restore();
-    T('User', 230, 672, 34, C.white, { w: 700, al: 'center' });
-    T('Field sales executive', 230, 708, 20, C.muted, { w: 500, al: 'center' });
-  });
-  CHATS.forEach((c, i) => {
-    const s = 5.0 + i * 3.6;
-    const x = CARD.x0 + i * CARD.step, y = CARD.y;
-    // connection line from avatar
-    const lp = eo(P(t, s - 0.1, 0.6));
-    if (lp > 0) {
-      const tx = x + CARD.w / 2, ty = y;
-      ctx.save();
-      ctx.beginPath();
-      const steps = 40;
-      for (let k = 0; k <= steps * lp; k++) {
-        const u = k / steps;
-        const bx = Math.pow(1 - u, 3) * 230 + 3 * Math.pow(1 - u, 2) * u * 230 + 3 * (1 - u) * u * u * tx + u * u * u * tx;
-        const by = Math.pow(1 - u, 3) * 448 + 3 * Math.pow(1 - u, 2) * u * 180 + 3 * (1 - u) * u * u * 180 + u * u * u * ty;
-        k === 0 ? ctx.moveTo(bx, by) : ctx.lineTo(bx, by);
-      }
-      const active = t >= s - 0.1 && t < s + 3.6;
-      ctx.strokeStyle = active ? C.maxis : 'rgba(122,193,67,0.35)'; ctx.lineWidth = active ? 3.5 : 2;
-      ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 40; ctx.stroke();
-      ctx.restore();
-    }
-    const cp = P(t, s, 0.55);
-    withPop(cp, x + CARD.w / 2, y + CARD.h / 2, () => chatCard(t, c, x, y, s));
-    // active highlight
-    const act = win(t, s, s + 3.6, 0.3);
-    if (i === 2) glow(x, y, CARD.w, CARD.h, 24, P(t, s, 0.3) * (1 - P(t, 18.2, 0.5)));
-    else glow(x, y, CARD.w, CARD.h, 24, act);
-  });
+  withPop(P(t, 4.6, 0.6), CHAT.x + CHAT.w / 2, CHAT.y + CHAT.h / 2, () => chatWindow(t));
+  withPop(P(t, 4.9, 0.6), 1460, 550, () => behindPanel(t));
   ctx.restore();
 }
-function chatCard(t, c, x, y, s) {
-  // shell
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
-  rr(x, y, CARD.w, CARD.h, 24); ctx.fillStyle = C.white; ctx.fill();
-  ctx.restore();
-  ctx.save(); rr(x, y, CARD.w, CARD.h, 24); ctx.clip();
-  ctx.fillStyle = C.ink; ctx.fillRect(x, y, CARD.w, 84);
-  ctx.fillStyle = C.maxis; ctx.fillRect(x, y + 84, CARD.w, 4);
-  ctx.restore();
-  icon('bot', x + 46, y + 44, 46, C.maxis);
-  T(c.name, x + 84, y + 42, 26, C.white, { w: 700 });
-  circle(x + CARD.w - 34, y + 42, 7); ctx.fillStyle = C.maxis; ctx.fill();
-  T('online', x + CARD.w - 48, y + 42, 16, C.muted, { w: 500, al: 'right' });
-  // question bubble (typed)
-  const qLines = wrap(c.q, 300, 22, 600);
-  const total = c.q.length;
-  const shown = Math.floor(total * P(t, s + 0.4, 1.0));
-  let qw = 0; font(22, 600); qLines.forEach(l => qw = Math.max(qw, ctx.measureText(l).width));
-  const qh = qLines.length * 30 + 28, qx = x + CARD.w - 24 - (qw + 36), qy = y + 120;
-  if (shown > 0) {
-    rr(qx, qy, qw + 36, qh, [18, 18, 4, 18]); ctx.fillStyle = C.maxis; ctx.fill();
-    let used = 0;
-    qLines.forEach((l, li) => {
-      const n = clamp(shown - used, 0, l.length); used += l.length + 1;
-      T(l.slice(0, n), qx + 18, qy + 28 + li * 30, 22, C.ink, { w: 600 });
-    });
-  }
-  // typing dots
-  const ay = qy + qh + 26;
-  const dA = win(t, s + 1.45, s + 2.1, 0.12);
-  if (dA > 0) {
-    ctx.save(); ctx.globalAlpha *= dA;
-    rr(x + 24, ay, 92, 46, [18, 18, 18, 4]); ctx.fillStyle = C.bubble; ctx.fill();
-    for (let k = 0; k < 3; k++) {
-      const b = Math.sin((t - s) * 10 - k * 0.9) * 4;
-      circle(x + 48 + k * 22, ay + 23 - Math.max(0, b), 5.5); ctx.fillStyle = C.inkMuted; ctx.fill();
-    }
-    ctx.restore();
-  }
-  // answer
-  const ap = eo(P(t, s + 2.05, 0.45));
-  if (ap > 0) {
-    const aLines = wrap(c.a, 330, 22, 500);
-    const ah = aLines.length * 31 + 28;
-    ctx.save(); ctx.globalAlpha *= ap; ctx.translate(0, (1 - ap) * 14);
-    rr(x + 24, ay, 370, ah, [18, 18, 18, 4]); ctx.fillStyle = C.bubble; ctx.fill();
-    aLines.forEach((l, li) => T(l, x + 44, ay + 29 + li * 31, 22, C.ink, { w: 500 }));
-    ctx.restore();
-    // source chip
-    const sp = eo(P(t, s + 2.6, 0.4));
-    if (sp > 0) {
-      const cy = ay + ah + 20;
-      const label = `Source: ${c.src}`;
-      const lw = tw(label, 17, 700), gw = tw('Governed', 17, 700);
-      const cw = 52 + lw + 18 + 22 + 8 + gw + 18;
-      ctx.save(); ctx.globalAlpha *= sp; ctx.translate((1 - sp) * -16, 0);
-      rr(x + 24, cy, cw, 40, 20); ctx.fillStyle = C.green; ctx.fill();
-      icon('db', x + 48, cy + 20, 26, C.maxis);
-      T(label, x + 70, cy + 20, 17, C.white, { w: 700 });
-      checkBadge(x + 70 + lw + 29, cy + 20, 11);
-      T('Governed', x + 70 + lw + 48, cy + 20, 17, C.maxis, { w: 700 });
+
+function chatWindow(t) {
+  const { x, y, w, h } = CHAT;
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+  rr(x, y, w, h, 26); ctx.fillStyle = C.white; ctx.fill(); ctx.restore();
+  ctx.save(); rr(x, y, w, h, 26); ctx.clip();
+  ctx.fillStyle = C.ink; ctx.fillRect(x, y, w, 92);
+  ctx.fillStyle = C.maxis; ctx.fillRect(x, y + 92, w, 4);
+  // header: the user, no agent names
+  circle(x + 54, y + 46, 28); ctx.fillStyle = C.navy2; ctx.fill(); ctx.strokeStyle = C.maxis; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.save(); circle(x + 54, y + 46, 26); ctx.clip(); icon('user', x + 54, y + 50, 40, C.white); ctx.restore();
+  T('User', x + 98, y + 34, 24, C.white, { w: 700 });
+  T('Field sales executive', x + 98, y + 62, 17, C.muted, { w: 500 });
+  T('One conversation', x + w - 30, y + 46, 18, C.maxis, { w: 700, al: 'right' });
+
+  // message layout (stable), then scroll so the newest message stays in view
+  const top = y + 124, bottom = y + h - 104;
+  let cy = 0; const items = [];
+  CONVO.forEach((c, i) => {
+    const s = EX_T(i);
+    const ql = wrap(c.q, 540, 22, 600); font(22, 600);
+    const qw = Math.max(...ql.map(l => ctx.measureText(l).width)) + 40, qh = ql.length * 30 + 28;
+    items.push({ kind: 'q', i, s, y: cy, h: qh, lines: ql, w: qw, text: c.q }); cy += qh + 16;
+    const al = wrap(c.a, 560, 22, 500), ah = al.length * 31 + 28;
+    items.push({ kind: 'a', i, s, y: cy, h: ah, lines: al }); cy += ah + 10;
+    items.push({ kind: 'c', i, s, y: cy, h: 40, src: c.src }); cy += 40 + 30;
+  });
+  const visibleBottom = it => it.y + it.h;
+  let target = 0;
+  items.forEach(it => {
+    const appear = it.kind === 'q' ? it.s : it.kind === 'a' ? it.s + 2.5 : it.s + 2.8;
+    const p = eo(P(t, appear, 0.5));
+    if (p > 0) target = Math.max(target, (visibleBottom(it) - (bottom - top)) * p);
+  });
+  const scroll = Math.max(0, target);
+  ctx.save(); ctx.beginPath(); ctx.rect(x, top - 20, w, bottom - top + 30); ctx.clip();
+  items.forEach(it => {
+    const yy = top + it.y - scroll;
+    if (it.kind === 'q') {
+      const shown = Math.floor(it.text.length * P(t, it.s, 0.7));
+      if (shown <= 0) return;
+      const bx = x + w - 30 - it.w;
+      rr(bx, yy, it.w, it.h, [18, 18, 4, 18]); ctx.fillStyle = C.maxis; ctx.fill();
+      let used = 0;
+      it.lines.forEach((l, li) => { const n = clamp(shown - used, 0, l.length); used += l.length + 1; T(l.slice(0, n), bx + 20, yy + 28 + li * 30, 22, C.ink, { w: 600 }); });
+    } else if (it.kind === 'a') {
+      const dA = win(t, it.s + 0.8, it.s + 2.55, 0.12);
+      if (dA > 0) {
+        ctx.save(); ctx.globalAlpha *= dA;
+        rr(x + 30, yy, 92, 46, [18, 18, 18, 4]); ctx.fillStyle = C.bubble; ctx.fill();
+        for (let k = 0; k < 3; k++) { const b = Math.sin((t - it.s) * 10 - k * 0.9) * 4; circle(x + 54 + k * 22, yy + 23 - Math.max(0, b), 5.5); ctx.fillStyle = C.inkMuted; ctx.fill(); }
+        ctx.restore();
+      }
+      const p = eo(P(t, it.s + 2.5, 0.45));
+      if (p <= 0) return;
+      ctx.save(); ctx.globalAlpha *= p; ctx.translate(0, (1 - p) * 14);
+      font(22, 500); const aw = Math.max(...it.lines.map(l => ctx.measureText(l).width)) + 44;
+      rr(x + 30, yy, aw, it.h, [18, 18, 18, 4]); ctx.fillStyle = C.bubble; ctx.fill();
+      it.lines.forEach((l, li) => T(l, x + 52, yy + 29 + li * 31, 22, C.ink, { w: 500 }));
+      ctx.restore();
+    } else {
+      const p = eo(P(t, it.s + 2.8, 0.4));
+      if (p <= 0) return;
+      const label = `Source: ${it.src}`, lw = tw(label, 17, 700), gw = tw('Governed', 17, 700);
+      ctx.save(); ctx.globalAlpha *= p; ctx.translate((1 - p) * -16, 0);
+      rr(x + 30, yy, 52 + lw + 18 + 22 + 8 + gw + 18, 40, 20); ctx.fillStyle = C.green; ctx.fill();
+      icon('db', x + 54, yy + 20, 26, C.maxis);
+      T(label, x + 76, yy + 20, 17, C.white, { w: 700 });
+      checkBadge(x + 76 + lw + 29, yy + 20, 11);
+      T('Governed', x + 76 + lw + 48, yy + 20, 17, C.maxis, { w: 700 });
       ctx.restore();
     }
+  });
+  ctx.restore();
+  // input bar
+  rr(x + 24, y + h - 80, w - 48, 56, 28); ctx.fillStyle = '#F1F5F9'; ctx.fill();
+  ctx.strokeStyle = '#D5DEE8'; ctx.lineWidth = 1.5; ctx.stroke();
+  T('Ask anything…', x + 54, y + h - 52, 20, C.inkMuted, { w: 500 });
+  circle(x + w - 56, y + h - 52, 20); ctx.fillStyle = C.maxis; ctx.fill();
+  ctx.fillStyle = C.ink; arrowHead(x + w - 54, y + h - 52, 0, 10);
+  ctx.restore();
+}
+
+function behindPanel(t) {
+  rr(1050, 150, 820, 800, 26); ctx.fillStyle = 'rgba(255,255,255,0.045)'; ctx.fill();
+  ctx.save(); ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2; rr(1050, 150, 820, 800, 26); ctx.stroke(); ctx.restore();
+  T('BEHIND THE SCENES', 1090, 196, 19, C.maxis, { w: 700, ls: 3 });
+  T('Agents hand off to each other', 1090, 236, 28, C.white, { w: 700 });
+  T('and pull each answer from the right governed source', 1090, 272, 20, C.muted, { w: 500 });
+
+  // static links
+  dashLine(CHAT_PT, { x: AGN[0].x - 60, y: AGN[0].y }, 'rgba(255,255,255,0.25)', 2);
+  for (let i = 0; i < 3; i++) {
+    const s = EX_T(i);
+    const used = P(t, s + 0.8, 0.3);
+    if (i > 0) {
+      dashLine({ x: AGN[i - 1].x + 60, y: AGN[i].y }, { x: AGN[i].x - 60, y: AGN[i].y }, used > 0 ? C.maxis : 'rgba(255,255,255,0.25)', used > 0 ? 3 : 2, -t * 30);
+      ctx.save(); ctx.globalAlpha *= 0.4 + 0.6 * used;
+      T('hand-off', (AGN[i - 1].x + AGN[i].x) / 2, AGN[i].y - 24, 16, used > 0 ? C.maxis : C.muted, { w: 700, al: 'center' });
+      ctx.restore();
+    }
+    dashLine({ x: AGN[i].x, y: AGN[i].y + 128 }, { x: SRN[i].x, y: SRN[i].y - 48 }, P(t, s + 1.3, 0.2) > 0 ? C.maxis : 'rgba(255,255,255,0.25)', 2);
   }
+  // agents
+  AGN.forEach((g, i) => {
+    const s = EX_T(i);
+    const act = win(t, s + 0.8, s + 2.7, 0.2);
+    circle(g.x, g.y, 58); ctx.fillStyle = act > 0 ? hexA('#123A66', 1) : C.navy2; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = act > 0 ? C.maxis : 'rgba(255,255,255,0.3)'; ctx.stroke();
+    if (act > 0) { ctx.save(); ctx.globalAlpha *= act; ctx.shadowColor = C.maxis; ctx.shadowBlur = 30; circle(g.x, g.y, 58); ctx.stroke(); ctx.restore(); }
+    icon('bot', g.x, g.y + 4, 60, act > 0 ? C.maxis : C.soft);
+    T('Agent', g.x, g.y + 86, 20, C.white, { w: 700, al: 'center' });
+    T(g.l, g.x, g.y + 112, 17, C.muted, { w: 500, al: 'center' });
+  });
+  // sources
+  SRN.forEach((r, i) => {
+    const s = EX_T(i);
+    const act = win(t, s + 1.55, s + 2.0, 0.12);
+    const g = ctx.createLinearGradient(r.x, r.y - 48, r.x, r.y + 48);
+    g.addColorStop(0, C.green2); g.addColorStop(1, C.green);
+    rr(r.x - 115, r.y - 48, 230, 96, 14); ctx.fillStyle = g; ctx.fill();
+    icon('db', r.x, r.y - 14, 34, C.maxis);
+    T(r.l, r.x, r.y + 26, 20, C.white, { w: 700, al: 'center' });
+    checkBadge(r.x + 97, r.y - 30, 13);
+    glow(r.x - 115, r.y - 48, 230, 96, 14, act);
+  });
+  T('Governed knowledge sources', 1460, 880, 18, C.muted, { w: 600, al: 'center', ls: 1 });
+  // pulses
+  CONVO.forEach((c, i) => {
+    const s = EX_T(i);
+    const from = i === 0 ? CHAT_PT : AGN[i - 1];
+    pulse(t, s + 0.8, s + 1.3, from, AGN[i]);
+    pulse(t, s + 1.3, s + 1.65, AGN[i], { x: SRN[i].x, y: SRN[i].y - 40 });
+    pulse(t, s + 1.75, s + 2.1, { x: SRN[i].x, y: SRN[i].y - 40 }, AGN[i]);
+    pulse(t, s + 2.1, s + 2.5, AGN[i], CHAT_PT);
+  });
 }
 
 /* ---------- Architecture ---------- */

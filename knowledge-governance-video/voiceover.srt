@@ -3,30 +3,30 @@
 Imagine every agent giving you answers you can trust!
 
 2
-00:00:03,800 --> 00:00:11,500
-Just ask! EKA, Pricing Agent, Data Agent... you get the same trusted answer, and you always see where it came from.
+00:00:03,800 --> 00:00:14,700
+Just ask! Which plan? What price? Is it available? One easy conversation, while behind the scenes, the agents hand off to each other and pull every answer from the right trusted source!
 
 3
-00:00:11,800 --> 00:00:16,700
+00:00:15,000 --> 00:00:19,900
 Here's the magic behind it. First, the agents: today's, and every new one coming.
 
 4
-00:00:17,000 --> 00:00:23,700
+00:00:20,200 --> 00:00:26,900
 They all ask one shared retrieval layer: reusable, safe, traceable and relevant, with rules that check every answer.
 
 5
-00:00:24,000 --> 00:00:29,300
+00:00:27,200 --> 00:00:32,500
 Underneath, one set of governance rules keeps every knowledge source accurate and up to date.
 
 6
-00:00:29,600 --> 00:00:35,300
+00:00:32,800 --> 00:00:38,500
 Ask a question, and it flows down, finds the right source, and comes right back, with proof!
 
 7
-00:00:35,600 --> 00:00:41,700
+00:00:38,800 --> 00:00:44,900
 Building a new agent? Easy! Register it, plug in, and inherit every rule. You're live from day one!
 
 8
-00:00:42,000 --> 00:00:44,900
+00:00:45,200 --> 00:00:48,100
 Every agent. One trusted knowledge foundation!
 
